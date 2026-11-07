@@ -1,0 +1,46 @@
+{
+	"name": "sailing-regatta-q7m3",
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"doctor": "./scripts/doctor.sh",
+		"dev": "bun scripts/check-bun.ts && bun scripts/dev.ts",
+		"build": "bun scripts/check-bun.ts && vite build",
+		"type-check": "tsc --noEmit",
+		"test": "bun test --conditions browser ./game ./synced-store ./ui/App.test.happydom.tsx",
+		"test:playwright": "bun run build && bunx playwright install chromium && bunx playwright test --update-snapshots",
+		"test:all": "bun run type-check && bun run test",
+		"verify": "bun run type-check && bun run test && bun run build && bunx playwright install chromium && bunx playwright test && bun run doctor",
+		"regenerate-screenshot": "bun run build && bunx playwright install chromium && REGEN_SCREENSHOTS=1 bunx playwright test tests/screenshot.test.playwright.ts",
+		"render-check": "bun run build && bunx playwright install chromium && RENDER_CHECK=1 bunx playwright test tests/render-check.test.playwright.ts",
+		"publish-to-poe-tiles": "bun run build && poe-tiles tiles upload",
+		"preinstall": "bun scripts/check-bun.ts"
+	},
+	"dependencies": {
+		"poe-tiles-sdk": "https://misc-dev-uploads.quora-913.workers.dev/e42fd6bd7feb70b37287c45a6e7573972532d08012c4630f9246862b0f0541c5",
+		"three": "0.170.0"
+	},
+	"devDependencies": {
+		"@playwright/test": "1.61.1",
+		"@tailwindcss/postcss": "4.2.2",
+		"@testing-library/jest-dom": "6.9.1",
+		"@testing-library/react": "16.3.2",
+		"@types/bun": "1.3.12",
+		"@types/react": "19.2.14",
+		"@types/react-dom": "19.2.3",
+		"@types/three": "0.170.0",
+		"@vitejs/plugin-react": "4.7.0",
+		"fake-indexeddb": "6.2.5",
+		"happy-dom": "20.11.2",
+		"react": "19.2.5",
+		"react-dom": "19.2.5",
+		"tailwindcss": "4.2.2",
+		"typescript": "7.0.2",
+		"vite": "6.4.2",
+		"zod": "4.5.4"
+	},
+	"engines": {
+		"bun": ">=1.4.2 <1.5.0",
+		"node": ">=22.22.0"
+	}
+}
