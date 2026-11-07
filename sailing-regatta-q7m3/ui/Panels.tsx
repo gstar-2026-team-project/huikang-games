@@ -1,5 +1,6 @@
 import type { PoeUserInfo } from "poe-tiles-sdk/v1/shared.js";
-import { formatTime } from "../game/format";
+import { formatSpeed, formatTime } from "../game/format";
+import type { RaceStats } from "../game/stats";
 import { Avatar } from "./Avatar";
 import { playerName } from "./data";
 
@@ -79,6 +80,7 @@ export interface FinishInfo {
 	timeMs: number;
 	newBest: boolean;
 	passed: PoeUserInfo[];
+	stats: RaceStats;
 }
 
 export function FinishBanner({ info }: { info: FinishInfo }) {
@@ -87,6 +89,24 @@ export function FinishBanner({ info }: { info: FinishInfo }) {
 			<span className="finish-title">Finished!</span>
 			<span className="finish-time">{formatTime(info.timeMs)}</span>
 			{info.newBest && <span className="finish-best">New personal best</span>}
+			<dl className="finish-stats" data-testid="finish-stats">
+				<div>
+					<dt>Avg speed</dt>
+					<dd>{formatSpeed(info.stats.avgSpeed)}</dd>
+				</div>
+				<div>
+					<dt>Top speed</dt>
+					<dd>{formatSpeed(info.stats.topSpeed)}</dd>
+				</div>
+				<div>
+					<dt>Velocity to buoys</dt>
+					<dd>{formatSpeed(info.stats.avgVmg)}</dd>
+				</div>
+				<div>
+					<dt>Distance</dt>
+					<dd>{Math.round(info.stats.distance)} m</dd>
+				</div>
+			</dl>
 			{info.passed.length > 0 && (
 				<span className="finish-passed">
 					{info.passed.slice(0, 3).map((profile) => (
@@ -122,6 +142,11 @@ export function HelpSheet({ onClose }: { onClose(): void }) {
 						the wind. The arrow by the speed gauge shows where the wind is blowing.
 					</li>
 					<li>The bar under your speed turns green on your fastest angles, often across the wind.</li>
+					<li>
+						Speed is how fast the boat moves (m/s). "To buoy" is your velocity toward the next buoy: how
+						many meters per second you actually close on it. Upwind it is lower than your speed because
+						you're zig-zagging; if it goes red, you're sailing away.
+					</li>
 					<li>The wind shifts a little during the race, the same way for everyone.</li>
 					<li>Everyone gets the same new course each day (UTC). Your best time counts on the leaderboard.</li>
 					<li>After a race, watch anyone's run from the replays.</li>

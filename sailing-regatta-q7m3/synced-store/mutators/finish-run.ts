@@ -15,6 +15,7 @@ import {
 	shiftDay,
 } from "../../game/course";
 import { formatTime } from "../../game/format";
+import { raceStats, statsMarkdown } from "../../game/stats";
 import type { TileMutator } from "./types";
 
 export function runKey(day: string, userId: string): string {
@@ -91,6 +92,7 @@ export const finishRun: TileMutator<"finishRun"> = async (ctx, input) => {
 			bestScore: "lowest",
 			label,
 			displayScore: time,
+			markdown: statsMarkdown(raceStats(course, input.trace, input.timeMs), input.timeMs),
 		},
 		{ mode: "merge", notifyOnHighScore: false },
 	);

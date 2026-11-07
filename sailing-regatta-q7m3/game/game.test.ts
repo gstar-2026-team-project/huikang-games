@@ -20,6 +20,7 @@ import {
 } from "./physics";
 import { createRace, type RaceState, resumeRace, stepRace } from "./race";
 import { poseAt } from "./replay";
+import { raceStats, statsMarkdown, velocityMadeGood } from "./stats";
 
 const TACK_ANGLE = (48 * Math.PI) / 180;
 
@@ -153,4 +154,25 @@ test("formatting", () => {
 	expect(formatTime(5_000)).toBe("0:05.0");
 	expect(formatDelta(2_340)).toBe("+2.3s");
 	expect(formatDelta(-1_100)).toBe("−1.1s");
+});
+
+describe("speed and velocity stats", () => {
+	test("VMG is full speed toward the mark, zero across, negative away", () => {
+		const boat = { x: 0, y: 0, heading: 0, speed: 10 };
+		expect(velocityMadeGood(boat, { x: 0, y: 100 })).toBeCloseTo(10, 5);
+		expect(velocityMadeGood(boat, { x: 100, y: 0 })).toBeCloseTo(0, 5);
+		expect(velocityMadeGood(boat, { x: 0, y: -100 })).toBeCloseTo(-10, 5);
+	});
+
+	test("finished-run stats are consistent with the course and the boat", () => {
+		const { course, race, timeMs } = sail("2026-11-09");
+		const stats = raceStats(course, race.trace, timeMs);
+		expect(stats.distance).toBeGreaterThanOrEqual(courseLength(course) * 0.95);
+		expect(stats.avgSpeed).toBeCloseTo(stats.distance / (timeMs / 1000), 5);
+		expect(stats.topSpeed).toBeLessThanOrEqual(MAX_SPEED * 1.1);
+		expect(stats.topSpeed).toBeGreaterThan(stats.avgSpeed);
+		// Tacking means progress round the course is slower than boat speed.
+		expect(stats.avgVmg).toBeLessThan(stats.avgSpeed);
+		expect(statsMarkdown(stats, timeMs)).toContain("Velocity toward buoys");
+	});
 });

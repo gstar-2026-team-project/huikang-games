@@ -2,11 +2,12 @@ import type { PoeUserInfo } from "poe-tiles-sdk/v1/shared.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { courseLabel, generateCourse, leaderboardIdFor } from "../game/course";
 import { formatDelta } from "../game/format";
+import { raceStats } from "../game/stats";
 import { createRace, type RaceEvent, type RaceState } from "../game/race";
 import type { AppProps } from "./app-contract";
 import { SoundBoard } from "./audio";
 import { type DayData, playerName, type RunRow } from "./data";
-import { HudView, type Leader } from "./HudView";
+import { HudView, type Leader, useHudRefs } from "./HudView";
 import { Countdown, FinishBanner, type FinishInfo, HelpSheet, ReadyPanel, Toast } from "./Panels";
 import { RaceController } from "./race-controller";
 import { nextReplaySpeed, ReplayBar, ReplayPicker } from "./ReplayPicker";
@@ -41,13 +42,7 @@ export function Regatta({ store, poe, resumeAudioContext, suppressLongPressMagni
 	const stageRef = useRef<HTMLDivElement>(null);
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const hudRef = useRef<HTMLDivElement>(null);
-	const minimapRef = useRef<HTMLCanvasElement>(null);
-	const timerRef = useRef<HTMLSpanElement>(null);
-	const marksRef = useRef<HTMLSpanElement>(null);
-	const speedRef = useRef<HTMLSpanElement>(null);
-	const speedBarRef = useRef<HTMLSpanElement>(null);
-	const windRef = useRef<HTMLSpanElement>(null);
-	const ironsRef = useRef<HTMLDivElement>(null);
+	const hudRefs = useHudRefs();
 	const controllerRef = useRef<RaceController | null>(null);
 	const sound = useMemo(() => new SoundBoard(resumeAudioContext), [resumeAudioContext]);
 	const runRef = useRef<{ runId: string; day: string } | null>(null);
@@ -144,7 +139,12 @@ export function Regatta({ store, poe, resumeAudioContext, suppressLongPressMagni
 				const passed = current.board.entries
 					.filter((e) => e.userId !== current.userId && e.score < myBest && e.score > event.elapsedMs)
 					.map((e) => current.profiles[e.userId] ?? ({ userId: e.userId } as PoeUserInfo));
-				setFinish({ timeMs: event.elapsedMs, newBest: event.elapsedMs < myBest, passed });
+				setFinish({
+					timeMs: event.elapsedMs,
+					newBest: event.elapsedMs < myBest,
+					passed,
+					stats: raceStats(generateCourse(run.day), race.trace, event.elapsedMs),
+				});
 				setPhase("finished");
 				store.mutate
 					.finishRun({
@@ -179,24 +179,17 @@ export function Regatta({ store, poe, resumeAudioContext, suppressLongPressMagni
 	// Mount the renderer once; the loop reports race events through a ref.
 	useEffect(() => {
 		const canvas = canvasRef.current;
-		const minimap = minimapRef.current;
+		const minimap = hudRefs.refs.minimap.current;
 		const stage = stageRef.current;
 		const hud = hudRef.current;
-		const nodes = [timerRef, marksRef, speedRef, speedBarRef, windRef, ironsRef].map((r) => r.current);
-		if (!canvas || !minimap || !stage || !hud || nodes.some((n) => !n)) return;
+		const nodes = hudRefs.nodes();
+		if (!canvas || !minimap || !stage || !hud || !nodes) return;
 		let controller: RaceController;
 		try {
 			controller = new RaceController(
 				canvas,
 				minimap,
-				{
-					timer: timerRef.current!,
-					marks: marksRef.current!,
-					speed: speedRef.current!,
-					speedBar: speedBarRef.current!,
-					windArrow: windRef.current!,
-					irons: ironsRef.current!,
-				},
+				nodes,
 				{
 					onRaceEvent: (event, race) => eventRef.current(event, race),
 					onReplayEnd: () => setPhase((p) => (p === "replay" ? "picker" : p)),
@@ -228,7 +221,7 @@ export function Regatta({ store, poe, resumeAudioContext, suppressLongPressMagni
 			controller.dispose();
 			controllerRef.current = null;
 		};
-	}, [suppressLongPressMagnifier]);
+	}, [suppressLongPressMagnifier, hudRefs]);
 
 	// New day's course: only swap it in while nobody is mid-race.
 	useEffect(() => {
@@ -341,7 +334,7 @@ export function Regatta({ store, poe, resumeAudioContext, suppressLongPressMagni
 			<canvas ref={canvasRef} className="scene" data-testid="scene" />
 			<div ref={hudRef} className="hud">
 				<HudView
-					refs={{ timer: timerRef, marks: marksRef, speed: speedRef, speedBar: speedBarRef, windArrow: windRef, irons: ironsRef, minimap: minimapRef }}
+					refs={hudRefs.refs}
 					showRace={showGauge}
 					muted={data.muted}
 					leader={leader}

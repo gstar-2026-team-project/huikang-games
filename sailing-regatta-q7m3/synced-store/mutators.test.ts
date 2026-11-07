@@ -56,6 +56,9 @@ describe("runs and leaderboard", () => {
 		expect(board.bestScore).toBe("lowest");
 		expect(board.label).toBe("Regatta · Nov 7, 2026");
 		expect(board.entries.map((e) => [e.userId, e.score])).toEqual([["alice", fastest + 40_000]]);
+		// The end screen shows each player's speed and velocity stats next to their time.
+		expect(board.entries[0]?.markdown).toContain("Speed: avg");
+		expect(board.entries[0]?.markdown).toContain("Velocity toward buoys");
 	});
 
 	test("finishing is idempotent and stale results change nothing", async () => {

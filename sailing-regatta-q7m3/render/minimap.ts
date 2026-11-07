@@ -162,3 +162,20 @@ export class Minimap {
 		ctx.restore();
 	}
 }
+
+/** Mini-map colours from the CSS tokens, so dark mode applies. */
+export function readMinimapColors(): MinimapColors {
+	const style = getComputedStyle(document.documentElement);
+	const read = (token: string) => style.getPropertyValue(token).trim() || "#888888";
+	return {
+		sea: read("--map-sea"),
+		edge: read("--map-edge"),
+		mark: read("--world-buoy"),
+		next: read("--world-buoy-next"),
+		done: read("--world-buoy-done"),
+		finish: read("--world-finish"),
+		boat: read("--map-boat"),
+		trail: read("--map-trail"),
+		wind: read("--map-wind"),
+	};
+}

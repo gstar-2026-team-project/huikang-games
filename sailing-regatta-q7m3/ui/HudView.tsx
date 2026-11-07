@@ -1,18 +1,40 @@
 import type { PoeUserInfo } from "poe-tiles-sdk/v1/shared.js";
-import type { Ref } from "react";
+import { useMemo, useRef } from "react";
 import { formatTime } from "../game/format";
 import { Avatar } from "./Avatar";
 import { playerName } from "./data";
+import type { HudNodes } from "./race-controller";
 
-export interface HudRefs {
-	timer: Ref<HTMLSpanElement>;
-	marks: Ref<HTMLSpanElement>;
-	speed: Ref<HTMLSpanElement>;
-	speedBar: Ref<HTMLSpanElement>;
-	windArrow: Ref<HTMLSpanElement>;
-	irons: Ref<HTMLDivElement>;
-	minimap: Ref<HTMLCanvasElement>;
+/** Element refs for the always-mounted HUD; the render loop writes into them. */
+export function useHudRefs() {
+	const timer = useRef<HTMLSpanElement>(null);
+	const marks = useRef<HTMLSpanElement>(null);
+	const speed = useRef<HTMLSpanElement>(null);
+	const speedBar = useRef<HTMLSpanElement>(null);
+	const vmg = useRef<HTMLSpanElement>(null);
+	const windArrow = useRef<HTMLSpanElement>(null);
+	const irons = useRef<HTMLDivElement>(null);
+	const minimap = useRef<HTMLCanvasElement>(null);
+	return useMemo(() => {
+		const refs = { timer, marks, speed, speedBar, vmg, windArrow, irons, minimap };
+		/** The mounted nodes, or null if any is missing. */
+		const nodes = (): HudNodes | null => {
+			const n = {
+				timer: timer.current,
+				marks: marks.current,
+				speed: speed.current,
+				speedBar: speedBar.current,
+				vmg: vmg.current,
+				windArrow: windArrow.current,
+				irons: irons.current,
+			};
+			return Object.values(n).every(Boolean) ? (n as HudNodes) : null;
+		};
+		return { refs, nodes };
+	}, []);
 }
+
+export type HudRefs = ReturnType<typeof useHudRefs>["refs"];
 
 export interface Leader {
 	profile: PoeUserInfo | undefined;
@@ -79,13 +101,25 @@ export function HudView({ refs, showRace, muted, leader, onHelp, onMute, onResta
 						↑
 					</span>
 				</span>
-				<span className="speed">
-					<span ref={refs.speed} className="speed-value">
-						0.0
+				<span className="metric">
+					<span className="metric-label">Speed</span>
+					<span className="metric-value">
+						<span ref={refs.speed} data-testid="speed">
+							0.0
+						</span>
+						<span className="metric-unit">m/s</span>
 					</span>
-					<span className="speed-unit">kn</span>
 					<span className="speed-track">
 						<span ref={refs.speedBar} className="speed-bar" data-tone="bad" />
+					</span>
+				</span>
+				<span className="metric" title="Velocity made good: how fast you are closing on the next buoy">
+					<span className="metric-label">To buoy</span>
+					<span className="metric-value">
+						<span ref={refs.vmg} data-testid="vmg" data-tone="ok">
+							0.0
+						</span>
+						<span className="metric-unit">m/s</span>
 					</span>
 				</span>
 			</div>

@@ -13,7 +13,7 @@ export function formatDelta(ms: number): string {
 	return `${sign}${(Math.abs(ms) / 1000).toFixed(1)}s`;
 }
 
-/** World units per second → knots-ish number for the speed gauge. */
-export function toKnots(speed: number): number {
-	return speed * 0.75;
+/** World units are meters, so speeds are already m/s: 9.24 → "9.2 m/s". */
+export function formatSpeed(speed: number): string {
+	return `${speed.toFixed(1)} m/s`;
 }

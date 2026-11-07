@@ -1,13 +1,14 @@
 import { isPoeTileForeground, subscribePoeTileForegroundState } from "poe-tiles-sdk/v1/client.js";
 import { MAX_FRAME_DT, NO_GO_ANGLE, SIM_DT, TRACE_INTERVAL_MS } from "../game/constants";
 import type { Course } from "../game/course";
-import { formatTime, toKnots } from "../game/format";
+import { formatTime } from "../game/format";
 import { normalizeAngle, polar, type Steer, trueWindAngle, windAt } from "../game/physics";
 import { createRace, type RaceEvent, type RaceState, stepRace } from "../game/race";
 import { poseAt } from "../game/replay";
+import { velocityMadeGood } from "../game/stats";
 import { createTutorial, stepTutorial, type TutorialState } from "../game/tutorial";
 import type { BoatPose } from "../render/boat";
-import { Minimap, type MinimapColors } from "../render/minimap";
+import { Minimap, type MinimapColors, readMinimapColors } from "../render/minimap";
 import { SailingScene } from "../render/scene";
 
 type Mode = "ready" | "racing" | "lesson" | "replay" | "paused";
@@ -18,6 +19,8 @@ export interface HudNodes {
 	marks: HTMLElement;
 	speed: HTMLElement;
 	speedBar: HTMLElement;
+	/** Velocity made good toward the next buoy. */
+	vmg: HTMLElement;
 	windArrow: HTMLElement;
 	irons: HTMLElement;
 }
@@ -360,8 +363,14 @@ export class RaceController {
 			? "Sailing lesson"
 			: nextMark >= total ? "Finished" : nextMark === total - 1 ? "Finish line" : `Mark ${nextMark + 1} of ${total - 1}`;
 		this.write("marks", () => (this.hud.marks.textContent = markText), markText);
-		const knots = toKnots(pose.speed).toFixed(1);
-		this.write("speed", () => (this.hud.speed.textContent = knots), knots);
+		const speed = pose.speed.toFixed(1);
+		this.write("speed", () => (this.hud.speed.textContent = speed), speed);
+		const target = course.marks[nextMark];
+		const vmg = target ? velocityMadeGood(pose, target) : null;
+		const vmgText = vmg === null ? "–" : vmg.toFixed(1);
+		this.write("vmg", () => (this.hud.vmg.textContent = vmgText), vmgText);
+		const vmgTone = vmg === null || Math.abs(vmg) < 0.5 ? "ok" : vmg > 0 ? "good" : "bad";
+		this.write("vmgTone", () => (this.hud.vmg.dataset.tone = vmgTone), vmgTone);
 		const bar = efficiency.toFixed(2);
 		this.write("bar", () => (this.hud.speedBar.style.transform = `scaleX(${bar})`), bar);
 		const tone = efficiency === 0 ? "bad" : efficiency > 0.9 ? "good" : "ok";
@@ -379,20 +388,4 @@ export class RaceController {
 		this.written.set(key, value);
 		apply();
 	}
-}
-
-function readMinimapColors(): MinimapColors {
-	const style = getComputedStyle(document.documentElement);
-	const read = (token: string) => style.getPropertyValue(token).trim() || "#888888";
-	return {
-		sea: read("--map-sea"),
-		edge: read("--map-edge"),
-		mark: read("--world-buoy"),
-		next: read("--world-buoy-next"),
-		done: read("--world-buoy-done"),
-		finish: read("--world-finish"),
-		boat: read("--map-boat"),
-		trail: read("--map-trail"),
-		wind: read("--map-wind"),
-	};
 }

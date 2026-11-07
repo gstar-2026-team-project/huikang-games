@@ -268,21 +268,38 @@
 	color: #2b8ac0;
 	line-height: 1;
 }
-.speed {
-	display: grid;
-	grid-template-columns: auto auto;
-	align-items: baseline;
-	column-gap: 3px;
-	row-gap: 4px;
+.metric {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 62px;
 }
-.speed-value {
-	font-variant-numeric: tabular-nums;
-	font-size: 20px;
+.metric-label {
+	font-size: 10px;
 	font-weight: 800;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+	color: var(--chrome-muted);
+}
+.metric-value {
+	display: flex;
+	align-items: baseline;
+	gap: 3px;
+	font-variant-numeric: tabular-nums;
+	font-size: 19px;
+	font-weight: 800;
+}
+.metric-value > span:first-child {
 	min-width: 2.6ch;
 	text-align: right;
 }
-.speed-unit {
+.metric-value [data-tone="good"] {
+	color: var(--good);
+}
+.metric-value [data-tone="bad"] {
+	color: var(--bad);
+}
+.metric-unit {
 	font-size: 11px;
 	color: var(--chrome-muted);
 	font-weight: 700;
@@ -750,4 +767,40 @@
 	font-weight: 700;
 	fill: var(--chrome-muted);
 	text-anchor: middle;
+}
+
+.finish-stats {
+	margin: 6px 0 0;
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 6px 14px;
+}
+.finish-stats div {
+	display: flex;
+	flex-direction: column;
+}
+.finish-stats dt {
+	font-size: 10px;
+	font-weight: 800;
+	text-transform: uppercase;
+	color: var(--chrome-muted);
+}
+.finish-stats dd {
+	margin: 0;
+	font-size: 15px;
+	font-weight: 800;
+	font-variant-numeric: tabular-nums;
+}
+
+/* Narrow phones: lift the gauge above the steering pads so they never overlap. */
+@media (max-width: 520px) {
+	.gauge {
+		bottom: calc(var(--safe-bottom) + 18px + clamp(74px, 22vw, 96px) + 10px);
+	}
+	.replay-bar {
+		bottom: calc(var(--safe-bottom) + 16px);
+	}
+	.stage[data-phase="replay"] .gauge {
+		bottom: calc(var(--safe-bottom) + 76px);
+	}
 }

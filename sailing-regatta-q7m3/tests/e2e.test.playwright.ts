@@ -59,6 +59,9 @@ test.describe("regatta", () => {
 		await frame.locator('[data-testid="start-lesson"]').click();
 		const coach = frame.locator('[data-testid="coach"]');
 		await expect(coach).toContainText("Hold ▶ to turn right");
+		// Live speed and velocity readouts are on screen and moving.
+		await expect(frame.locator('[data-testid="speed"]')).not.toHaveText("0.0");
+		await expect(frame.locator('[data-testid="vmg"]')).toHaveText("–");
 		const hold = async (key: string, ms: number) => {
 			await frame.evaluate((k) => window.dispatchEvent(new KeyboardEvent("keydown", { key: k })), key);
 			await page.waitForTimeout(ms);
@@ -93,6 +96,7 @@ test.describe("regatta", () => {
 			await expect(banner).toBeVisible();
 			const time = (await banner.locator(".finish-time").textContent()) ?? "";
 			expect(time).toMatch(/^\d:\d\d\.\d$/);
+			await expect(banner.locator('[data-testid="finish-stats"]')).toContainText("Velocity to buoys");
 
 			// Bob's screen shows Alice's time as the one to beat, with her name.
 			await expect(bob.locator('[data-testid="leader-chip"]')).toContainText(`Alice ${time}`, { timeout: 10_000 });
