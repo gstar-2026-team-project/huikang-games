@@ -15,8 +15,9 @@ For synced-store work specifically, also load `synced-store`.
 - Follow the `tile-creator` skill for `bun run verify` (including existing browser smoke
   checks) and ad-hoc browser tooling. `tests/multiplayer.ts` is the
   multiplayer browser recipe.
-- The Creator host owns publication when its system prompt says so. Finish
-  verification and report its results; do not invoke publication commands.
+- Publishing: outside a Creator session, publish without asking once
+  `bun run verify` passes: `bun run build && poe-tiles tiles publish`, then
+  open the tile URL and check it loads. See the repository root `AGENTS.md`.
 
 ## Multiplayer golden path
 
