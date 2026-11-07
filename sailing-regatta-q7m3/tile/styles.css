@@ -808,3 +808,50 @@
 .metric[hidden] {
 	display: none;
 }
+
+.action-hint {
+	position: absolute;
+	left: 50%;
+	transform: translateX(-50%);
+	bottom: calc(var(--safe-bottom) + 92px);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 1px;
+	padding: 6px 14px;
+	border-radius: 14px;
+	background: var(--chrome-bg);
+	box-shadow: var(--shadow);
+	white-space: nowrap;
+	max-width: calc(100% - 2 * var(--edge));
+}
+.action-label {
+	font-size: 10px;
+	font-weight: 800;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+	color: var(--chrome-muted);
+}
+.action-text {
+	font-size: 15px;
+	font-weight: 800;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 100%;
+}
+.action-hint[data-kind="hold"] .action-text {
+	color: var(--good);
+}
+.action-hint[data-kind="tack"] .action-text {
+	color: var(--primary);
+}
+/* The pad the coach suggests: a steady outline, no looping animation. */
+.pad[data-hint="true"] {
+	outline: 4px solid var(--primary);
+	outline-offset: 3px;
+}
+@media (max-width: 520px) {
+	.action-hint {
+		bottom: calc(var(--safe-bottom) + 18px + clamp(74px, 22vw, 96px) + 88px);
+	}
+}

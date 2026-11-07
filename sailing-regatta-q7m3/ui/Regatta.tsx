@@ -13,7 +13,8 @@ import { RaceController } from "./race-controller";
 import { nextReplaySpeed, ReplayBar, ReplayPicker } from "./ReplayPicker";
 import { SteerPads } from "./SteerPads";
 import { useResumeRun } from "./useResumeRun";
-import { CoachCard, LessonDone, useLesson } from "./Lesson";
+import { useTimersAndToast } from "./useTimersAndToast";
+import { ActionHint, CoachCard, LessonDone, padHint, useLesson } from "./Lesson";
 
 export type Phase =
 	| "ready"
@@ -28,11 +29,9 @@ export type Phase =
 
 /** Hold the decisive finish on screen this long before the end sheet. */
 const FINISH_BEAT_MS = 1700;
-const TOAST_MS = 2200;
 export function Regatta({ store, poe, resumeAudioContext, suppressLongPressMagnifier, data }: AppProps & { data: DayData }) {
 	const [phase, setPhase] = useState<Phase>("ready");
 	const [count, setCount] = useState(3);
-	const [toast, setToast] = useState<{ text: string; id: number } | null>(null);
 	const [finish, setFinish] = useState<FinishInfo | null>(null);
 	const [help, setHelp] = useState(false);
 	const [replay, setReplay] = useState<{ run: RunRow; speed: number } | null>(null);
@@ -49,24 +48,13 @@ export function Regatta({ store, poe, resumeAudioContext, suppressLongPressMagni
 	const dataRef = useRef(data);
 	dataRef.current = data;
 	const resumedRunRef = useRef<string | null>(null);
-	const timersRef = useRef<number[]>([]);
 
 	const course = useMemo(() => generateCourse(data.day), [data.day]);
 	const label = courseLabel(data.day);
 	const leaderboardId = leaderboardIdFor(data.day);
 	sound.muted = data.muted;
 
-	const later = useCallback((fn: () => void, ms: number) => {
-		timersRef.current.push(window.setTimeout(fn, ms));
-	}, []);
-	const showToast = useCallback(
-		(text: string) => {
-			const id = Date.now();
-			setToast({ text, id });
-			later(() => setToast((t) => (t?.id === id ? null : t)), TOAST_MS);
-		},
-		[later],
-	);
+	const { toast, showToast, later, clearTimers } = useTimersAndToast();
 
 	const goReady = useCallback(() => {
 		runRef.current = null;
@@ -103,6 +91,7 @@ export function Regatta({ store, poe, resumeAudioContext, suppressLongPressMagni
 		onEnter: useCallback(() => setPhase("lesson"), []),
 		onDone: useCallback(() => setPhase("lessonDone"), []),
 	});
+	const setLessonAction = lesson.setAction;
 	const lessonStepRef = useRef(lesson.onStep);
 	lessonStepRef.current = lesson.onStep;
 
@@ -194,6 +183,7 @@ export function Regatta({ store, poe, resumeAudioContext, suppressLongPressMagni
 					onRaceEvent: (event, race) => eventRef.current(event, race),
 					onReplayEnd: () => setPhase((p) => (p === "replay" ? "picker" : p)),
 					onLessonStep: (step, done) => lessonStepRef.current(step, done),
+					onLessonAction: (action) => setLessonAction(action),
 				},
 			);
 		} catch (error) {
@@ -217,11 +207,11 @@ export function Regatta({ store, poe, resumeAudioContext, suppressLongPressMagni
 			observer.disconnect();
 			scheme.removeEventListener("change", onScheme);
 			for (const remove of removers) remove();
-			for (const id of timersRef.current) window.clearTimeout(id);
+			clearTimers();
 			controller.dispose();
 			controllerRef.current = null;
 		};
-	}, [suppressLongPressMagnifier, hudRefs]);
+	}, [suppressLongPressMagnifier, hudRefs, setLessonAction, clearTimers]);
 
 	// New day's course: only swap it in while nobody is mid-race.
 	useEffect(() => {
@@ -342,7 +332,14 @@ export function Regatta({ store, poe, resumeAudioContext, suppressLongPressMagni
 					onMute={toggleMute}
 					onRestart={racing ? restart : null}
 				/>
-				{atHelm && <SteerPads onPad={(side, down) => controllerRef.current?.setPad(side, down)} haptics={poe.haptics} />}
+				{atHelm && (
+					<SteerPads
+						onPad={(side, down) => controllerRef.current?.setPad(side, down)}
+						haptics={poe.haptics}
+						hint={phase === "lesson" ? padHint(lesson.action) : null}
+					/>
+				)}
+				{phase === "lesson" && <ActionHint action={lesson.action} />}
 				{phase === "ready" && (
 					<ReadyPanel
 						label={label}

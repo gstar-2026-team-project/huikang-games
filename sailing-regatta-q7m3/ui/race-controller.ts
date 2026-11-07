@@ -1,35 +1,27 @@
 import { isPoeTileForeground, subscribePoeTileForegroundState } from "poe-tiles-sdk/v1/client.js";
-import { MAX_FRAME_DT, NO_GO_ANGLE, SIM_DT, TRACE_INTERVAL_MS } from "../game/constants";
+import { type CoachAction, sameAction } from "../game/coach";
+import { MAX_FRAME_DT, SIM_DT, TRACE_INTERVAL_MS } from "../game/constants";
 import type { Course } from "../game/course";
-import { formatTime } from "../game/format";
-import { normalizeAngle, polar, type Steer, trueWindAngle, windAt } from "../game/physics";
+import { type Steer, windAt } from "../game/physics";
 import { createRace, type RaceEvent, type RaceState, stepRace } from "../game/race";
 import { poseAt } from "../game/replay";
-import { velocityMadeGood } from "../game/stats";
 import { createTutorial, stepTutorial, type TutorialState } from "../game/tutorial";
 import type { BoatPose } from "../render/boat";
 import { Minimap, type MinimapColors, readMinimapColors } from "../render/minimap";
 import { SailingScene } from "../render/scene";
+import { type HudNodes, HudWriter } from "./hud-writer";
 
 type Mode = "ready" | "racing" | "lesson" | "replay" | "paused";
 
-/** DOM nodes the loop writes directly, at canvas cadence, only on change. */
-export interface HudNodes {
-	timer: HTMLElement;
-	marks: HTMLElement;
-	speed: HTMLElement;
-	speedBar: HTMLElement;
-	/** Velocity made good toward the next buoy. */
-	vmg: HTMLElement;
-	windArrow: HTMLElement;
-	irons: HTMLElement;
-}
+export type { HudNodes } from "./hud-writer";
 
 export interface ControllerEvents {
 	onRaceEvent(event: RaceEvent, race: RaceState): void;
 	onReplayEnd(): void;
 	/** A lesson step was completed; `done` once the whole lesson is. */
 	onLessonStep(step: number, done: boolean): void;
+	/** The lesson coach's suggested helm action changed. */
+	onLessonAction(action: CoachAction): void;
 }
 
 export interface ReplayRun {
@@ -80,6 +72,8 @@ export class RaceController {
 	private replay: (ReplayRun & { ms: number; speed: number }) | null = null;
 	private lesson: TutorialState | null = null;
 	private lessonCourseVersion = -1;
+	private lessonPlanVersion = -1;
+	private lessonAction: CoachAction | null = null;
 	private pads = { left: false, right: false };
 	private keys = { left: false, right: false };
 	private raf = 0;
@@ -90,18 +84,19 @@ export class RaceController {
 	private awakeUntil = 0;
 	private snapCamera = true;
 	private frameCount = 0;
-	private written = new Map<string, string>();
+	private hudWriter: HudWriter;
 	private minimapColors: MinimapColors;
 	private readyPose: BoatPose = { x: 0, y: 0, heading: 0, speed: 0 };
 
 	constructor(
 		canvas: HTMLCanvasElement,
 		minimapCanvas: HTMLCanvasElement,
-		private hud: HudNodes,
+		hud: HudNodes,
 		private events: ControllerEvents,
 	) {
 		this.scene = new SailingScene(canvas);
 		this.minimap = new Minimap(minimapCanvas, this.scene.pixelRatio);
+		this.hudWriter = new HudWriter(hud);
 		this.minimapColors = readMinimapColors();
 		window.addEventListener("keydown", this.onKey);
 		window.addEventListener("keyup", this.onKey);
@@ -197,6 +192,9 @@ export class RaceController {
 	startLesson(): void {
 		this.lesson = createTutorial();
 		this.lessonCourseVersion = this.lesson.courseVersion;
+		this.lessonPlanVersion = this.lesson.planVersion;
+		this.lessonAction = this.lesson.action;
+		this.events.onLessonAction(this.lesson.action);
 		this.applyCourse(this.lesson.course);
 		this.scene.setGuide(this.lesson.guide);
 		this.race = null;
@@ -301,7 +299,14 @@ export class RaceController {
 			if (lesson.courseVersion !== this.lessonCourseVersion) {
 				this.lessonCourseVersion = lesson.courseVersion;
 				this.applyCourse(lesson.course);
+			}
+			if (lesson.planVersion !== this.lessonPlanVersion) {
+				this.lessonPlanVersion = lesson.planVersion;
 				this.scene.setGuide(lesson.guide);
+				if (!this.lessonAction || !sameAction(this.lessonAction, lesson.action)) {
+					this.lessonAction = lesson.action;
+					this.events.onLessonAction(lesson.action);
+				}
 			}
 		} else if (this.mode === "replay" && this.replay) {
 			this.replay.ms += dt * 1000 * this.replay.speed;
@@ -355,45 +360,6 @@ export class RaceController {
 			this.minimap.draw(course, view.pose, view.nextMark, wind, view.trace, this.minimapColors, this.lesson?.guide);
 		}
 		this.frameCount++;
-		this.writeHud(course, view, wind);
-	}
-
-	private writeHud(course: Course, view: View, wind: number): void {
-		const { pose, nextMark } = view;
-		const twa = trueWindAngle(pose.heading, wind);
-		const efficiency = polar(twa);
-		const total = course.marks.length;
-		this.write("timer", () => (this.hud.timer.textContent = formatTime(view.ms)), formatTime(view.ms));
-		const markText = this.lesson
-			? "Sailing lesson"
-			: nextMark >= total ? "Finished" : nextMark === total - 1 ? "Finish line" : `Mark ${nextMark + 1} of ${total - 1}`;
-		this.write("marks", () => (this.hud.marks.textContent = markText), markText);
-		const speed = pose.speed.toFixed(1);
-		this.write("speed", () => (this.hud.speed.textContent = speed), speed);
-		const target = course.marks[nextMark];
-		const vmg = target ? velocityMadeGood(pose, target) : null;
-		// No buoy to close on (lesson warm-up, after the finish): hide the readout.
-		const vmgShown = String(vmg !== null);
-		this.write("vmgShown", () => (this.hud.vmg.closest<HTMLElement>(".metric")!.hidden = vmg === null), vmgShown);
-		const vmgText = vmg === null ? "" : vmg.toFixed(1);
-		this.write("vmg", () => (this.hud.vmg.textContent = vmgText), vmgText);
-		const vmgTone = vmg === null || Math.abs(vmg) < 0.5 ? "ok" : vmg > 0 ? "good" : "bad";
-		this.write("vmgTone", () => (this.hud.vmg.dataset.tone = vmgTone), vmgTone);
-		const bar = efficiency.toFixed(2);
-		this.write("bar", () => (this.hud.speedBar.style.transform = `scaleX(${bar})`), bar);
-		const tone = efficiency === 0 ? "bad" : efficiency > 0.9 ? "good" : "ok";
-		this.write("tone", () => (this.hud.speedBar.dataset.tone = tone), tone);
-		// The arrow shows where the wind blows relative to the camera (boat heading).
-		const relative = Math.round((normalizeAngle(wind + Math.PI - pose.heading) * 180) / Math.PI);
-		this.write("wind", () => (this.hud.windArrow.style.transform = `rotate(${relative}deg)`), String(relative));
-		const inIrons = this.steering() && twa < NO_GO_ANGLE && pose.speed < 4;
-		this.write("irons", () => (this.hud.irons.dataset.show = String(inIrons)), String(inIrons));
-	}
-
-	/** Apply a DOM write only when its value changed since the last frame. */
-	private write(key: string, apply: () => void, value: string): void {
-		if (this.written.get(key) === value) return;
-		this.written.set(key, value);
-		apply();
+		this.hudWriter.write({ course, ...view, wind, lesson: this.lesson !== null, steering: this.steering() });
 	}
 }

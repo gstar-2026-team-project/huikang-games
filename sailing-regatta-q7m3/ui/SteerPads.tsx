@@ -7,9 +7,12 @@ type Side = "left" | "right";
 export function SteerPads({
 	onPad,
 	haptics,
+	hint = null,
 }: {
 	onPad(side: Side, down: boolean): void;
 	haptics: PoeAPI["haptics"];
+	/** The lesson coach highlights the pad it suggests pressing. */
+	hint?: Side | null;
 }) {
 	const handlers = (side: Side) => ({
 		onPointerDown: (event: PointerEvent<HTMLButtonElement>) => {
@@ -30,10 +33,24 @@ export function SteerPads({
 	});
 	return (
 		<>
-			<button type="button" className="pad pad-left" aria-label="Steer left" data-testid="pad-left" {...handlers("left")}>
+			<button
+				type="button"
+				className="pad pad-left"
+				aria-label="Steer left"
+				data-testid="pad-left"
+				data-hint={hint === "left"}
+				{...handlers("left")}
+			>
 				◀
 			</button>
-			<button type="button" className="pad pad-right" aria-label="Steer right" data-testid="pad-right" {...handlers("right")}>
+			<button
+				type="button"
+				className="pad pad-right"
+				aria-label="Steer right"
+				data-testid="pad-right"
+				data-hint={hint === "right"}
+				{...handlers("right")}
+			>
 				▶
 			</button>
 		</>

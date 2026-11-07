@@ -62,6 +62,10 @@ test.describe("regatta", () => {
 		// Every lesson step has a buoy, so speed and velocity toward it are both live numbers.
 		await expect(frame.locator('[data-testid="speed"]')).not.toHaveText("0.0");
 		await expect(frame.locator('[data-testid="vmg"]')).toHaveText(/^-?\d+\.\d$/);
+		// The live coach suggests the first move and highlights that pad.
+		await expect(frame.locator('[data-testid="action-hint"]')).toContainText("Turn right");
+		await expect(frame.locator('[data-testid="pad-right"]')).toHaveAttribute("data-hint", "true");
+		await expect(frame.locator('[data-testid="pad-left"]')).toHaveAttribute("data-hint", "false");
 		// Sail the two steering buoys with the real controls.
 		await sailCourse(frame, 60_000, (probe) => (probe.lessonStep ?? 0) >= 2);
 		await expect(coach).toContainText("straight across the wind");

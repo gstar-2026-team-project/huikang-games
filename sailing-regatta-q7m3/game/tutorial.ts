@@ -2,6 +2,7 @@ import { MAX_SPEED, NO_GO_ANGLE, SIM_DT, TRACE_INTERVAL_MS } from "./constants";
 import { type Course, distance, type Point } from "./course";
 import { type Boat, sailSide, type Steer, stepBoat, trueWindAngle } from "./physics";
 import { markRadius } from "./race";
+import { type CoachAction, coachAction, planRoute, sameAction, type Side } from "./coach";
 
 export interface TutorialStep {
 	title: string;
@@ -23,12 +24,12 @@ export const TUTORIAL_STEPS: readonly TutorialStep[] = [
 	{ title: "In irons", text: "That's called being in irons. Turn away from the wind to get moving again." },
 	{
 		title: "Sailing upwind",
-		text: "Follow the zig-zag path about 45° off the wind. \"To buoy\" stays positive even though you're not pointing at it.",
+		text: "This buoy is upwind. Follow the path about 50° off the wind. \"To buoy\" stays positive even though you're not pointing at it.",
 	},
-	{ title: "Tacking", text: "Tack! At the corner, turn through the wind onto the next leg of the path." },
+	{ title: "Tacking", text: "Keep following the path. When the hint says “Tack now”, turn through the wind onto the other tack." },
 	{
 		title: "Tacking",
-		text: "Keep zig-zagging up the path, tacking at each corner, and sail into the buoy's ring.",
+		text: "Follow the path into the buoy's ring, tacking again whenever the hint says so.",
 	},
 ];
 
@@ -46,10 +47,8 @@ const HOLD_GOAL_MS = 1500;
 const MOVING_SPEED = 6;
 /** The upwind buoy is placed this far straight upwind of the boat. */
 const UPWIND_BUOY_DISTANCE = 140;
-/** Each zig-zag leg's angle off the wind: clear of the no-go zone and still quick. */
-const GUIDE_LEG_ANGLE = 50 * DEG;
-/** Target upwind rise per half-leg of the zig-zag; adjusted so legs fit the buoy exactly. */
-const ZIGZAG_LEG_RISE = 30;
+/** The coach replans the route and the ideal action this often (simulation steps). */
+const REPLAN_EVERY_STEPS = 12;
 /** Upwind angle band the lesson accepts: just outside the no-go zone to about 65°. */
 const UPWIND_MAX_ANGLE = 65 * DEG;
 /** Rolling trail kept for the mini-map. */
@@ -61,10 +60,16 @@ export interface TutorialState {
 	boat: Boat;
 	/** Wind from the north, steady, so the lesson is about the boat. One mark: this step's buoy. */
 	course: Course;
-	/** The intended path to the buoy, drawn on the water. */
+	/** Live route from the boat to the buoy, drawn on the water and the mini-map. */
 	guide: Point[];
-	/** Bumped whenever the buoy or path changes. */
+	/** What the coach suggests doing with the helm right now. */
+	action: CoachAction;
+	/** Bumped whenever the buoy changes. */
 	courseVersion: number;
+	/** Bumped whenever the route or the action is replanned. */
+	planVersion: number;
+	planSide: Side;
+	sinceReplan: number;
 	elapsedMs: number;
 	holdMs: number;
 	tackFrom: 1 | -1;
@@ -76,54 +81,46 @@ function offset(from: Point, bearing: number, length: number): Point {
 	return { x: from.x + Math.sin(bearing) * length, y: from.y + Math.cos(bearing) * length };
 }
 
-/**
- * Tacking path from `from` up to a buoy straight upwind of it. Every leg,
- * including the last one into the buoy, is GUIDE_LEG_ANGLE off the wind, so
- * a sailor who follows the dots never sails into the no-go zone.
- */
-export function zigzagPath(from: Point, buoy: Point, firstSide: 1 | -1): Point[] {
-	const dx = buoy.x - from.x;
-	const dy = buoy.y - from.y;
-	const length = Math.hypot(dx, dy);
-	const up = { x: dx / length, y: dy / length };
-	const right = { x: up.y, y: -up.x };
-	// Corners sit at rises h, 3h, 5h, … alternating sides; the buoy is at 2n·h.
-	const legs = Math.max(1, Math.round(length / (2 * ZIGZAG_LEG_RISE)));
-	const rise = length / (2 * legs);
-	const swing = rise * Math.tan(GUIDE_LEG_ANGLE);
-	const points: Point[] = [from];
-	let side = firstSide;
-	for (let k = 0; k < legs; k++) {
-		const along = rise * (2 * k + 1);
-		points.push({
-			x: from.x + up.x * along + right.x * swing * side,
-			y: from.y + up.y * along + right.y * swing * side,
-		});
-		side = side === 1 ? -1 : 1;
-	}
-	points.push(buoy);
-	return points;
+function placeBuoy(t: TutorialState, buoy: Point): void {
+	t.course = { ...t.course, start: { x: t.boat.x, y: t.boat.y }, marks: [buoy] };
+	t.courseVersion += 1;
 }
 
-function placeBuoy(t: TutorialState, buoy: Point, guide: Point[]): void {
-	t.course = { ...t.course, start: { x: t.boat.x, y: t.boat.y }, marks: [buoy] };
-	t.guide = guide;
-	t.courseVersion += 1;
+/**
+ * Recompute a good route from where the boat is now, and the helm action
+ * that follows it. On the in-irons step the coach deliberately points at
+ * the upwind buoy, because stalling there is the lesson.
+ */
+export function replan(t: TutorialState): void {
+	const buoy = t.course.marks[0];
+	if (!buoy) return;
+	const wind = t.course.baseWind;
+	let heading: number;
+	if (t.step === 3) {
+		heading = Math.atan2(buoy.x - t.boat.x, buoy.y - t.boat.y);
+		t.guide = [{ x: t.boat.x, y: t.boat.y }, buoy];
+	} else {
+		const plan = planRoute(t.boat, buoy, wind, t.planSide);
+		t.planSide = plan.side;
+		t.guide = plan.route;
+		heading = plan.heading;
+	}
+	t.action = coachAction(t.boat, heading, wind);
+	t.planVersion += 1;
+	t.sinceReplan = 0;
 }
 
 function enterStep(t: TutorialState): void {
 	t.holdMs = 0;
 	const placement = STEP_BUOYS[t.step];
 	if (placement) {
-		const buoy = offset(t.boat, placement.bearing, placement.distance);
-		placeBuoy(t, buoy, [{ x: t.boat.x, y: t.boat.y }, buoy]);
+		placeBuoy(t, offset(t.boat, placement.bearing, placement.distance));
 	} else if (t.step === 5) {
-		const wind = t.course.baseWind;
-		const buoy = offset(t.boat, wind, UPWIND_BUOY_DISTANCE);
-		placeBuoy(t, buoy, zigzagPath(t.boat, buoy, sailSide(t.boat.heading, wind)));
+		placeBuoy(t, offset(t.boat, t.course.baseWind, UPWIND_BUOY_DISTANCE));
 	} else if (t.step === 6) {
 		t.tackFrom = sailSide(t.boat.heading, t.course.baseWind);
 	}
+	replan(t);
 }
 
 export function createTutorial(): TutorialState {
@@ -133,7 +130,11 @@ export function createTutorial(): TutorialState {
 		boat: { x: 0, y: 0, heading: Math.PI / 2, speed: MAX_SPEED * 0.5 },
 		course: { day: "lesson", baseWind: 0, shifts: [], start: { x: 0, y: 0 }, marks: [] },
 		guide: [],
+		action: { kind: "hold" },
 		courseVersion: 0,
+		planVersion: 0,
+		planSide: 1,
+		sinceReplan: 0,
 		elapsedMs: 0,
 		holdMs: 0,
 		tackFrom: 1,
@@ -185,6 +186,7 @@ export function stepTutorial(t: TutorialState, steer: Steer): "advanced" | "done
 	const twa = trueWindAngle(t.boat.heading, wind);
 	const holding = t.step === 5 && twa > NO_GO_ANGLE && twa < UPWIND_MAX_ANGLE && t.boat.speed > MOVING_SPEED;
 	t.holdMs = holding ? t.holdMs + SIM_DT * 1000 : 0;
+	if (++t.sinceReplan >= REPLAN_EVERY_STEPS) replan(t);
 
 	if (t.elapsedMs >= t.nextSampleMs) {
 		t.nextSampleMs += TRACE_INTERVAL_MS;

@@ -1,5 +1,6 @@
 import type { PoeAPI } from "poe-tiles-sdk/v1/client.js";
 import { type RefObject, useCallback, useState } from "react";
+import type { CoachAction } from "../game/coach";
 import { TUTORIAL_STEPS } from "../game/tutorial";
 import type { AppProps } from "./app-contract";
 import type { SoundBoard } from "./audio";
@@ -27,6 +28,7 @@ export function useLesson({
 }) {
 	const [step, setStep] = useState(0);
 	const [cheer, setCheer] = useState(false);
+	const [action, setAction] = useState<CoachAction>({ kind: "hold" });
 
 	const start = useCallback(() => {
 		sound.unlock();
@@ -57,7 +59,7 @@ export function useLesson({
 		[sound, haptics, store, later, onDone],
 	);
 
-	return { step, cheer, start, onStep };
+	return { step, cheer, action, setAction, start, onStep };
 }
 
 export function CoachCard({ step, cheer, onExit }: { step: number; cheer: boolean; onExit(): void }) {
@@ -99,4 +101,25 @@ export function LessonDone({ onRace, onAgain }: { onRace(): void; onAgain(): voi
 			</button>
 		</div>
 	);
+}
+
+function actionText(action: CoachAction): string {
+	if (action.kind === "hold") return "✓ Hold this course";
+	if (action.kind === "turn") return action.dir === -1 ? "◀ Turn left" : "Turn right ▶";
+	return action.dir === -1 ? "◀ Tack now: turn left through the wind" : "Tack now: turn right through the wind ▶";
+}
+
+/** The coach's live suggestion, recomputed from where the boat is right now. */
+export function ActionHint({ action }: { action: CoachAction }) {
+	return (
+		<div className="action-hint" data-kind={action.kind} data-testid="action-hint" role="status" aria-live="polite">
+			<span className="action-label">Ideal action</span>
+			<span className="action-text">{actionText(action)}</span>
+		</div>
+	);
+}
+
+/** Which steering pad the coach wants pressed, if any. */
+export function padHint(action: CoachAction): "left" | "right" | null {
+	return action.kind === "hold" ? null : action.dir === -1 ? "left" : "right";
 }
