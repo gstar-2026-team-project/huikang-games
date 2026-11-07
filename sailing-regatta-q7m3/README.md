@@ -1,4 +1,4 @@
-# Daily Regatta
+# Sailrunner
 
 Take the helm of a small sailboat and race a fresh buoy course every day. You
 can't sail straight into the wind, so the skill is picking your angles,

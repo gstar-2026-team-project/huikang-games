@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { NO_GO_ANGLE } from "./constants";
 import { distance } from "./course";
 import { normalizeAngle, type Steer } from "./physics";
 import { velocityMadeGood } from "./stats";
@@ -70,16 +71,53 @@ test("the upwind buoy sits straight upwind behind a zig-zag path, and tacking ma
 	expect(buoy.y).toBeGreaterThan(t.boat.y + 100);
 	expect(t.guide.length).toBeGreaterThanOrEqual(4);
 	expect(t.guide.at(-1)).toEqual(buoy);
-	// Every leg of the drawn path is sailable: at least 40° off the wind.
-	for (let i = 1; i < t.guide.length - 1; i++) {
+	// Every leg of the drawn path, including the last one into the buoy, is sailable.
+	for (let i = 1; i < t.guide.length; i++) {
 		const a = t.guide[i - 1]!;
 		const b = t.guide[i]!;
-		expect(Math.abs(Math.atan2(b.x - a.x, b.y - a.y))).toBeGreaterThan(40 * DEG);
+		expect(Math.abs(Math.atan2(b.x - a.x, b.y - a.y))).toBeGreaterThan(NO_GO_ANGLE + 5 * DEG);
 	}
 	// Sailing 50° off the wind still closes on the buoy.
 	const boat = { ...t.boat, heading: 50 * DEG, speed: 10 };
 	expect(velocityMadeGood(boat, buoy)).toBeGreaterThan(5);
 });
+
+/** A learner who ignores the text and just steers along the dots on the water. */
+function dotFollower() {
+	let version = -1;
+	let next = 1;
+	return (t: TutorialState): Steer => {
+		if (t.courseVersion !== version) {
+			version = t.courseVersion;
+			next = 1;
+		}
+		// The recovery step is the one place the prompt says to leave the path.
+		if (t.step === 4) return steerTo(t, 55 * DEG);
+		while (next < t.guide.length - 1 && distance(t.boat, t.guide[next]!) < 14) next++;
+		const target = t.guide[next]!;
+		return steerTo(t, Math.atan2(target.x - t.boat.x, target.y - t.boat.y));
+	};
+}
+
+test("following the dots completes every step of the lesson", () => {
+	const t = createTutorial();
+	const follow = dotFollower();
+	let result: ReturnType<typeof stepTutorial> = null;
+	for (let i = 0; i < 60 * 180 && result !== "done"; i++) result = stepTutorial(t, follow(t));
+	expect(result).toBe("done");
+	expect(t.elapsedMs).toBeLessThan(150_000);
+});
+
+for (const distanceUp of [60, 140, 175, 230]) {
+	test(`a zig-zag ${distanceUp} m upwind has only sailable legs`, () => {
+		const path = zigzagPath({ x: 10, y: 20 }, { x: 10, y: 20 + distanceUp }, -1);
+		for (let i = 1; i < path.length; i++) {
+			const a = path[i - 1]!;
+			const b = path[i]!;
+			expect(Math.abs(Math.atan2(b.x - a.x, b.y - a.y))).toBeCloseTo(50 * DEG, 5);
+		}
+	});
+}
 
 test("zigzag paths alternate sides and end at the buoy", () => {
 	const path = zigzagPath({ x: 0, y: 0 }, { x: 0, y: 150 }, 1);

@@ -54,7 +54,7 @@ describe("runs and leaderboard", () => {
 		expect(runs[0]!.trace.length).toBe(9);
 		const board = await bob.query(readBoard);
 		expect(board.bestScore).toBe("lowest");
-		expect(board.label).toBe("Regatta · Nov 7, 2026");
+		expect(board.label).toBe("Sailrunner · Nov 7, 2026");
 		expect(board.entries.map((e) => [e.userId, e.score])).toEqual([["alice", fastest + 40_000]]);
 		// The end screen shows each player's speed and velocity stats next to their time.
 		expect(board.entries[0]?.markdown).toContain("Speed: avg");

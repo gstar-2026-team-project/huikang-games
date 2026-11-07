@@ -56,7 +56,7 @@ export function shiftDay(day: string, days: number): string {
 /** Dated label so a notification read tomorrow still names the right course. */
 export function courseLabel(day: string): string {
 	const month = MONTHS[Number(day.slice(5, 7)) - 1] ?? "";
-	return `Regatta · ${month} ${Number(day.slice(8, 10))}, ${day.slice(0, 4)}`;
+	return `Sailrunner · ${month} ${Number(day.slice(8, 10))}, ${day.slice(0, 4)}`;
 }
 
 export function leaderboardIdFor(day: string): string {
@@ -76,6 +76,7 @@ function fromWindFrame(baseWind: number, up: number, side: number): Point {
  * every leg is sailable well inside MAX_RUN_MS (see course.test.ts).
  */
 export function generateCourse(day: string): Course {
+	// The seed keeps the original "regatta/" prefix so existing days keep their courses.
 	const rng = createRng(hashSeed(`regatta/${day}`));
 	const baseWind = range(rng, 0, Math.PI * 2);
 	const side = rng() < 0.5 ? -1 : 1;

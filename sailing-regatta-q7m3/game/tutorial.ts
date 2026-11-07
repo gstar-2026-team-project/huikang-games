@@ -46,8 +46,10 @@ const HOLD_GOAL_MS = 1500;
 const MOVING_SPEED = 6;
 /** The upwind buoy is placed this far straight upwind of the boat. */
 const UPWIND_BUOY_DISTANCE = 140;
-/** Half-width of the drawn zig-zag: how far each tack swings either side. */
-const ZIGZAG_HALF_WIDTH = 32;
+/** Each zig-zag leg's angle off the wind: clear of the no-go zone and still quick. */
+const GUIDE_LEG_ANGLE = 50 * DEG;
+/** Target upwind rise per half-leg of the zig-zag; adjusted so legs fit the buoy exactly. */
+const ZIGZAG_LEG_RISE = 30;
 /** Upwind angle band the lesson accepts: just outside the no-go zone to about 65°. */
 const UPWIND_MAX_ANGLE = 65 * DEG;
 /** Rolling trail kept for the mini-map. */
@@ -74,19 +76,29 @@ function offset(from: Point, bearing: number, length: number): Point {
 	return { x: from.x + Math.sin(bearing) * length, y: from.y + Math.cos(bearing) * length };
 }
 
-/** Tacking path from `from` up to a buoy straight upwind, legs at 45° to the wind. */
+/**
+ * Tacking path from `from` up to a buoy straight upwind of it. Every leg,
+ * including the last one into the buoy, is GUIDE_LEG_ANGLE off the wind, so
+ * a sailor who follows the dots never sails into the no-go zone.
+ */
 export function zigzagPath(from: Point, buoy: Point, firstSide: 1 | -1): Point[] {
+	const dx = buoy.x - from.x;
+	const dy = buoy.y - from.y;
+	const length = Math.hypot(dx, dy);
+	const up = { x: dx / length, y: dy / length };
+	const right = { x: up.y, y: -up.x };
+	// Corners sit at rises h, 3h, 5h, … alternating sides; the buoy is at 2n·h.
+	const legs = Math.max(1, Math.round(length / (2 * ZIGZAG_LEG_RISE)));
+	const rise = length / (2 * legs);
+	const swing = rise * Math.tan(GUIDE_LEG_ANGLE);
 	const points: Point[] = [from];
 	let side = firstSide;
-	let x = from.x;
-	let y = from.y;
-	for (;;) {
-		const targetX = buoy.x + side * ZIGZAG_HALF_WIDTH;
-		const rise = Math.abs(targetX - x);
-		if (y + rise >= buoy.y - ZIGZAG_HALF_WIDTH) break;
-		x = targetX;
-		y += rise;
-		points.push({ x, y });
+	for (let k = 0; k < legs; k++) {
+		const along = rise * (2 * k + 1);
+		points.push({
+			x: from.x + up.x * along + right.x * swing * side,
+			y: from.y + up.y * along + right.y * swing * side,
+		});
 		side = side === 1 ? -1 : 1;
 	}
 	points.push(buoy);

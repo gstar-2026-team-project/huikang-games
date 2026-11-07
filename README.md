@@ -6,7 +6,7 @@ Each game lives in its own folder with its own `package.json`, tests, and
 
 | Folder | Game |
 | --- | --- |
-| [`sailing-regatta-q7m3/`](sailing-regatta-q7m3/) | **Daily Regatta**: race a sailboat around a new buoy course every day, with a sailing lesson, a shared leaderboard, and replays. |
+| [`sailing-regatta-q7m3/`](sailing-regatta-q7m3/) | **Sailrunner**: race a sailboat around a new buoy course every day, with a sailing lesson, a shared leaderboard, and replays. |
 
 ## Working on a game
 

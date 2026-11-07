@@ -71,7 +71,7 @@ describe("course", () => {
 		expect(isDayKey("2026-13-40")).toBe(false);
 		expect(isDayKey("nope")).toBe(false);
 		expect(shiftDay("2026-03-01", 2)).toBe("2026-02-27");
-		expect(courseLabel("2026-11-07")).toBe("Regatta · Nov 7, 2026");
+		expect(courseLabel("2026-11-07")).toBe("Sailrunner · Nov 7, 2026");
 		expect(courseLabel("2026-11-07").length).toBeLessThanOrEqual(40);
 	});
 

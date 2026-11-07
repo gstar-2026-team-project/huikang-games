@@ -35,7 +35,7 @@ test("passing someone's time notifies only them; the actor just gets a Recents b
 			.manager("bob")
 			.wait((v) => v.previewTimestamp === 4000 && v.pushes.length === bobBefore.pushes.length + 1);
 		expect(bobAfter.unreadCount).toBe(bobBefore.unreadCount + 1);
-		expect(bobAfter.preview).toBe("alice beat your time on Regatta · Nov 7, 2026");
+		expect(bobAfter.preview).toBe("alice beat your time on Sailrunner · Nov 7, 2026");
 		const aliceAfter = await h.manager("alice").wait((v) => v.previewTimestamp === 4000);
 		expect(aliceAfter.preview).toStartWith("You took the lead");
 		expect(aliceAfter.unreadCount).toBe(aliceBefore.unreadCount);
