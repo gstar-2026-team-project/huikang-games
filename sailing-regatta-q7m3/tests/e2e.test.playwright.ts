@@ -59,19 +59,14 @@ test.describe("regatta", () => {
 		await frame.locator('[data-testid="start-lesson"]').click();
 		const coach = frame.locator('[data-testid="coach"]');
 		await expect(coach).toContainText("Hold ▶ to turn right");
-		// Live speed and velocity readouts are on screen and moving.
+		// Every lesson step has a buoy, so speed and velocity toward it are both live numbers.
 		await expect(frame.locator('[data-testid="speed"]')).not.toHaveText("0.0");
-		await expect(frame.locator('[data-testid="vmg"]')).toHaveText("–");
-		const hold = async (key: string, ms: number) => {
-			await frame.evaluate((k) => window.dispatchEvent(new KeyboardEvent("keydown", { key: k })), key);
-			await page.waitForTimeout(ms);
-			await frame.evaluate((k) => window.dispatchEvent(new KeyboardEvent("keyup", { key: k })), key);
-		};
-		await hold("ArrowRight", 1500);
-		await expect(coach).toContainText("Now hold ◀ to turn left");
-		await hold("ArrowLeft", 1500);
-		await expect(coach).toContainText("speed bar goes green");
+		await expect(frame.locator('[data-testid="vmg"]')).toHaveText(/^-?\d+\.\d$/);
+		// Sail the two steering buoys with the real controls.
+		await sailCourse(frame, 60_000, (probe) => (probe.lessonStep ?? 0) >= 2);
+		await expect(coach).toContainText("straight across the wind");
 		expect(await frame.evaluate(() => window.__regattaProbe?.().lessonStep)).toBe(2);
+		await expect(frame.locator('[data-testid="vmg"]')).toBeVisible();
 		await coach.getByRole("button", { name: "Exit lesson" }).click();
 		await expect(frame.locator('[data-testid="start-race"]')).toBeVisible();
 	});
@@ -90,6 +85,8 @@ test.describe("regatta", () => {
 			const bob = sessions.bob.frame;
 			await alice.locator('[data-testid="start-race"]').click();
 			await expect(alice.locator('[data-testid="pad-left"]')).toBeVisible({ timeout: 8_000 });
+			// During a race there is always a next buoy, so velocity toward it is a number.
+			await expect(alice.locator('[data-testid="vmg"]')).toHaveText(/^-?\d+\.\d$/);
 			await sailCourse(alice, 200_000);
 
 			const banner = alice.locator('[data-testid="finish-banner"]');

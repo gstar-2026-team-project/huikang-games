@@ -1,46 +1,55 @@
-import { MARK_RADIUS, MAX_SPEED, NO_GO_ANGLE, SIM_DT, TRACE_INTERVAL_MS } from "./constants";
-import { type Course, distance } from "./course";
-import { type Boat, normalizeAngle, polar, sailSide, type Steer, stepBoat, trueWindAngle } from "./physics";
+import { MAX_SPEED, NO_GO_ANGLE, SIM_DT, TRACE_INTERVAL_MS } from "./constants";
+import { type Course, distance, type Point } from "./course";
+import { type Boat, sailSide, type Steer, stepBoat, trueWindAngle } from "./physics";
+import { markRadius } from "./race";
 
 export interface TutorialStep {
 	title: string;
 	text: string;
 }
 
-/** The lesson, in order. Each step completes from what the player does on the water. */
+/** The lesson, in order. Every step has a buoy to sail to and a path drawn on the water. */
 export const TUTORIAL_STEPS: readonly TutorialStep[] = [
-	{ title: "Steering", text: "Hold ▶ to turn right." },
-	{ title: "Steering", text: "Now hold ◀ to turn left." },
+	{ title: "Steering", text: "Hold ▶ to turn right, then follow the path into the buoy's ring." },
+	{ title: "Steering", text: "Now hold ◀ to turn left and sail to the next buoy." },
 	{
 		title: "Fastest angle",
-		text: "Turn until the speed bar goes green, then hold that course. Sailing across the wind is fastest.",
+		text: "This buoy is straight across the wind, your fastest direction. Sail to it and watch the speed bar go green.",
 	},
 	{
 		title: "In irons",
-		text: "Now turn into the wind, until the wind arrow points straight down at you. Watch the boat stall.",
+		text: "This buoy is straight upwind. Try pointing right at it and watch the boat stall.",
 	},
 	{ title: "In irons", text: "That's called being in irons. Turn away from the wind to get moving again." },
 	{
 		title: "Sailing upwind",
-		text: "A buoy has appeared straight upwind. You can't point at it, so sail about 45° off the wind instead (yellow bar).",
+		text: "Follow the zig-zag path about 45° off the wind. \"To buoy\" stays positive even though you're not pointing at it.",
 	},
-	{ title: "Tacking", text: "Tack! Turn through the wind to the other side, then settle at about 45° again." },
+	{ title: "Tacking", text: "Tack! At the corner, turn through the wind onto the next leg of the path." },
 	{
 		title: "Tacking",
-		text: "Zig-zag up to the buoy, tacking when it falls behind your shoulder. Sail into the ring.",
+		text: "Keep zig-zagging up the path, tacking at each corner, and sail into the buoy's ring.",
 	},
 ];
 
-/** Turn needed for each steering step (radians). */
-const TURN_GOAL = (50 * Math.PI) / 180;
-/** How long the fast angle / upwind angle must be held. */
+const DEG = Math.PI / 180;
+/** Where each step's buoy goes, relative to the boat: bearing (from north, clockwise) and distance. */
+const STEP_BUOYS: ReadonlyArray<{ bearing: number; distance: number }> = [
+	{ bearing: 150 * DEG, distance: 75 },
+	{ bearing: 65 * DEG, distance: 85 },
+	{ bearing: 95 * DEG, distance: 110 },
+	{ bearing: 0, distance: 60 },
+];
+/** Hold time for the upwind-angle step. */
 const HOLD_GOAL_MS = 1500;
 /** Speed that counts as "moving again" after stalling. */
 const MOVING_SPEED = 6;
-/** The lesson buoy is placed this far straight upwind of the boat. */
-const BUOY_DISTANCE = 130;
+/** The upwind buoy is placed this far straight upwind of the boat. */
+const UPWIND_BUOY_DISTANCE = 140;
+/** Half-width of the drawn zig-zag: how far each tack swings either side. */
+const ZIGZAG_HALF_WIDTH = 32;
 /** Upwind angle band the lesson accepts: just outside the no-go zone to about 65°. */
-const UPWIND_MAX_ANGLE = (65 * Math.PI) / 180;
+const UPWIND_MAX_ANGLE = 65 * DEG;
 /** Rolling trail kept for the mini-map. */
 const TRAIL_SAMPLES = 240;
 
@@ -48,33 +57,84 @@ export interface TutorialState {
 	step: number;
 	done: boolean;
 	boat: Boat;
-	/** Wind from the north, steady, so the lesson is about the boat. */
+	/** Wind from the north, steady, so the lesson is about the boat. One mark: this step's buoy. */
 	course: Course;
-	/** Bumped whenever the course (the lesson buoy) changes. */
+	/** The intended path to the buoy, drawn on the water. */
+	guide: Point[];
+	/** Bumped whenever the buoy or path changes. */
 	courseVersion: number;
 	elapsedMs: number;
-	turned: number;
 	holdMs: number;
 	tackFrom: 1 | -1;
 	trace: number[];
 	nextSampleMs: number;
 }
 
+function offset(from: Point, bearing: number, length: number): Point {
+	return { x: from.x + Math.sin(bearing) * length, y: from.y + Math.cos(bearing) * length };
+}
+
+/** Tacking path from `from` up to a buoy straight upwind, legs at 45° to the wind. */
+export function zigzagPath(from: Point, buoy: Point, firstSide: 1 | -1): Point[] {
+	const points: Point[] = [from];
+	let side = firstSide;
+	let x = from.x;
+	let y = from.y;
+	for (;;) {
+		const targetX = buoy.x + side * ZIGZAG_HALF_WIDTH;
+		const rise = Math.abs(targetX - x);
+		if (y + rise >= buoy.y - ZIGZAG_HALF_WIDTH) break;
+		x = targetX;
+		y += rise;
+		points.push({ x, y });
+		side = side === 1 ? -1 : 1;
+	}
+	points.push(buoy);
+	return points;
+}
+
+function placeBuoy(t: TutorialState, buoy: Point, guide: Point[]): void {
+	t.course = { ...t.course, start: { x: t.boat.x, y: t.boat.y }, marks: [buoy] };
+	t.guide = guide;
+	t.courseVersion += 1;
+}
+
+function enterStep(t: TutorialState): void {
+	t.holdMs = 0;
+	const placement = STEP_BUOYS[t.step];
+	if (placement) {
+		const buoy = offset(t.boat, placement.bearing, placement.distance);
+		placeBuoy(t, buoy, [{ x: t.boat.x, y: t.boat.y }, buoy]);
+	} else if (t.step === 5) {
+		const wind = t.course.baseWind;
+		const buoy = offset(t.boat, wind, UPWIND_BUOY_DISTANCE);
+		placeBuoy(t, buoy, zigzagPath(t.boat, buoy, sailSide(t.boat.heading, wind)));
+	} else if (t.step === 6) {
+		t.tackFrom = sailSide(t.boat.heading, t.course.baseWind);
+	}
+}
+
 export function createTutorial(): TutorialState {
-	const course: Course = { day: "lesson", baseWind: 0, shifts: [], start: { x: 0, y: 0 }, marks: [] };
-	return {
+	const t: TutorialState = {
 		step: 0,
 		done: false,
 		boat: { x: 0, y: 0, heading: Math.PI / 2, speed: MAX_SPEED * 0.5 },
-		course,
+		course: { day: "lesson", baseWind: 0, shifts: [], start: { x: 0, y: 0 }, marks: [] },
+		guide: [],
 		courseVersion: 0,
 		elapsedMs: 0,
-		turned: 0,
 		holdMs: 0,
 		tackFrom: 1,
 		trace: [],
 		nextSampleMs: 0,
 	};
+	enterStep(t);
+	return t;
+}
+
+function inRing(t: TutorialState): boolean {
+	const buoy = t.course.marks[0];
+	return buoy !== undefined && distance(t.boat, buoy) <= markRadius(t.course, 0);
 }
 
 function stepComplete(t: TutorialState): boolean {
@@ -83,9 +143,9 @@ function stepComplete(t: TutorialState): boolean {
 	switch (t.step) {
 		case 0:
 		case 1:
-			return t.turned >= TURN_GOAL;
 		case 2:
-			return t.holdMs >= HOLD_GOAL_MS;
+		case 7:
+			return inRing(t);
 		case 3:
 			return twa < NO_GO_ANGLE && t.boat.speed < 2.5;
 		case 4:
@@ -99,47 +159,19 @@ function stepComplete(t: TutorialState): boolean {
 				twa < UPWIND_MAX_ANGLE &&
 				t.boat.speed > MOVING_SPEED * 0.7
 			);
-		case 7: {
-			const buoy = t.course.marks[0];
-			return buoy !== undefined && distance(t.boat, buoy) <= MARK_RADIUS;
-		}
 		default:
 			return false;
 	}
-}
-
-function enterStep(t: TutorialState): void {
-	t.turned = 0;
-	t.holdMs = 0;
-	if (t.step === 5) {
-		const wind = t.course.baseWind;
-		const buoy = {
-			x: t.boat.x + Math.sin(wind) * BUOY_DISTANCE,
-			y: t.boat.y + Math.cos(wind) * BUOY_DISTANCE,
-		};
-		t.course = { ...t.course, marks: [buoy] };
-		t.courseVersion += 1;
-	}
-	if (t.step === 6) t.tackFrom = sailSide(t.boat.heading, t.course.baseWind);
 }
 
 /** Advance one fixed step. Mutates `t`; reports when a lesson step completes. */
 export function stepTutorial(t: TutorialState, steer: Steer): "advanced" | "done" | null {
 	if (t.done) return null;
 	const wind = t.course.baseWind;
-	const before = t.boat.heading;
 	t.boat = stepBoat(t.boat, steer, wind, SIM_DT);
 	t.elapsedMs += SIM_DT * 1000;
-	const delta = normalizeAngle(t.boat.heading - before);
-	if (t.step === 0 && delta > 0) t.turned += delta;
-	if (t.step === 1 && delta < 0) t.turned -= delta;
 	const twa = trueWindAngle(t.boat.heading, wind);
-	const holding =
-		t.step === 2
-			? polar(twa) >= 0.9 && t.boat.speed >= MAX_SPEED * 0.75
-			: t.step === 5
-				? twa > NO_GO_ANGLE && twa < UPWIND_MAX_ANGLE && t.boat.speed > MOVING_SPEED
-				: false;
+	const holding = t.step === 5 && twa > NO_GO_ANGLE && twa < UPWIND_MAX_ANGLE && t.boat.speed > MOVING_SPEED;
 	t.holdMs = holding ? t.holdMs + SIM_DT * 1000 : 0;
 
 	if (t.elapsedMs >= t.nextSampleMs) {

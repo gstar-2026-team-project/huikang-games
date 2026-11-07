@@ -12,11 +12,11 @@ import {
 	Vector3,
 	WebGLRenderer,
 } from "three";
-import type { Course } from "../game/course";
+import type { Course, Point } from "../game/course";
 import { normalizeAngle } from "../game/physics";
 import { BOAT_LENGTH, type BoatModel, type BoatPose, createBoatModel } from "./boat";
 import { type Palette, readPalette } from "./palette";
-import { addToScene, Marks, Sea } from "./world";
+import { addToScene, GuidePath, Marks, Sea } from "./world";
 
 /** Chase camera offset behind and above the boat, in world units. */
 const CAMERA_BACK = 21;
@@ -45,6 +45,7 @@ export class SailingScene {
 	private boat: BoatModel;
 	private sea: Sea;
 	private marks: Marks;
+	private guide: GuidePath;
 	private sun = new DirectionalLight(0xffffff, 1.6);
 	private hemi = new HemisphereLight(0xffffff, 0x335566, 1.4);
 	private cameraHeading = 0;
@@ -60,8 +61,9 @@ export class SailingScene {
 		this.boat = createBoatModel(palette);
 		this.sea = new Sea(palette);
 		this.marks = new Marks(palette);
+		this.guide = new GuidePath(palette);
 		this.sun.position.set(-40, 80, 30);
-		addToScene(this.scene, this.sea.root, this.marks.root, this.boat.group, this.sun, this.hemi);
+		addToScene(this.scene, this.sea.root, this.marks.root, this.guide.mesh, this.boat.group, this.sun, this.hemi);
 		this.applyPalette(palette);
 	}
 
@@ -76,11 +78,17 @@ export class SailingScene {
 		this.applyPalette(palette);
 		this.sea.setPalette(palette);
 		this.marks.setPalette(palette);
+		this.guide.setPalette(palette);
 	}
 
 	setCourse(course: Course): void {
 		this.marks.setCourse(course);
 		this.sea.resetWake();
+	}
+
+	/** Show an intended path on the water (the lesson); empty to hide it. */
+	setGuide(points: readonly Point[]): void {
+		this.guide.setPath(points);
 	}
 
 	resize(width: number, height: number): void {
@@ -121,6 +129,7 @@ export class SailingScene {
 		this.boat.dispose();
 		this.sea.dispose();
 		this.marks.dispose();
+		this.guide.dispose();
 		this.renderer.dispose();
 	}
 }

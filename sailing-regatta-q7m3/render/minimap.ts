@@ -1,4 +1,4 @@
-import type { Course } from "../game/course";
+import type { Course, Point } from "../game/course";
 import type { BoatPose } from "./boat";
 
 export interface MinimapColors {
@@ -68,6 +68,7 @@ export class Minimap {
 		wind: number,
 		trace: readonly number[],
 		colors: MinimapColors,
+		guide: readonly Point[] = [],
 	): void {
 		const ctx = this.ctx;
 		const size = this.size;
@@ -81,13 +82,13 @@ export class Minimap {
 		ctx.lineWidth = 1.5;
 		ctx.stroke();
 
-		// Course legs.
+		// Course legs, or the lesson's intended path when there is one.
+		const path = guide.length >= 2 ? guide : [course.start, ...course.marks];
 		ctx.setLineDash([3, 4]);
-		ctx.strokeStyle = colors.edge;
-		ctx.lineWidth = 1;
+		ctx.strokeStyle = guide.length >= 2 ? colors.next : colors.edge;
+		ctx.lineWidth = guide.length >= 2 ? 2.5 : 1;
 		ctx.beginPath();
-		ctx.moveTo(...this.project(course.start.x, course.start.y));
-		for (const mark of course.marks) ctx.lineTo(...this.project(mark.x, mark.y));
+		path.forEach((p, i) => (i === 0 ? ctx.moveTo(...this.project(p.x, p.y)) : ctx.lineTo(...this.project(p.x, p.y))));
 		ctx.stroke();
 		ctx.setLineDash([]);
 

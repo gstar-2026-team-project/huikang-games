@@ -167,6 +167,7 @@ export class RaceController {
 	}
 
 	showReady(): void {
+		this.scene.setGuide([]);
 		this.mode = "ready";
 		this.race = null;
 		this.replay = null;
@@ -176,6 +177,7 @@ export class RaceController {
 	}
 
 	startRace(race: RaceState): void {
+		this.scene.setGuide([]);
 		this.race = race;
 		this.replay = null;
 		this.lesson = null;
@@ -196,6 +198,7 @@ export class RaceController {
 		this.lesson = createTutorial();
 		this.lessonCourseVersion = this.lesson.courseVersion;
 		this.applyCourse(this.lesson.course);
+		this.scene.setGuide(this.lesson.guide);
 		this.race = null;
 		this.replay = null;
 		this.mode = "lesson";
@@ -205,6 +208,7 @@ export class RaceController {
 	}
 
 	startReplay(run: ReplayRun, speed: number): void {
+		this.scene.setGuide([]);
 		this.replay = { ...run, ms: 0, speed };
 		this.race = null;
 		this.lesson = null;
@@ -297,6 +301,7 @@ export class RaceController {
 			if (lesson.courseVersion !== this.lessonCourseVersion) {
 				this.lessonCourseVersion = lesson.courseVersion;
 				this.applyCourse(lesson.course);
+				this.scene.setGuide(lesson.guide);
 			}
 		} else if (this.mode === "replay" && this.replay) {
 			this.replay.ms += dt * 1000 * this.replay.speed;
@@ -347,7 +352,7 @@ export class RaceController {
 		});
 		this.snapCamera = false;
 		if (!this.steering() || this.frameCount % MINIMAP_EVERY_N_FRAMES === 0) {
-			this.minimap.draw(course, view.pose, view.nextMark, wind, view.trace, this.minimapColors);
+			this.minimap.draw(course, view.pose, view.nextMark, wind, view.trace, this.minimapColors, this.lesson?.guide);
 		}
 		this.frameCount++;
 		this.writeHud(course, view, wind);
@@ -367,7 +372,10 @@ export class RaceController {
 		this.write("speed", () => (this.hud.speed.textContent = speed), speed);
 		const target = course.marks[nextMark];
 		const vmg = target ? velocityMadeGood(pose, target) : null;
-		const vmgText = vmg === null ? "–" : vmg.toFixed(1);
+		// No buoy to close on (lesson warm-up, after the finish): hide the readout.
+		const vmgShown = String(vmg !== null);
+		this.write("vmgShown", () => (this.hud.vmg.closest<HTMLElement>(".metric")!.hidden = vmg === null), vmgShown);
+		const vmgText = vmg === null ? "" : vmg.toFixed(1);
 		this.write("vmg", () => (this.hud.vmg.textContent = vmgText), vmgText);
 		const vmgTone = vmg === null || Math.abs(vmg) < 0.5 ? "ok" : vmg > 0 ? "good" : "bad";
 		this.write("vmgTone", () => (this.hud.vmg.dataset.tone = vmgTone), vmgTone);

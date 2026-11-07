@@ -8,6 +8,7 @@ interface Probe {
 	heading: number;
 	wind: number;
 	nextMark: { x: number; y: number } | null;
+	lessonStep: number | null;
 }
 
 const TACK_ANGLE = (50 * Math.PI) / 180;
@@ -28,17 +29,23 @@ async function press(frame: Frame, key: string, down: boolean): Promise<void> {
 }
 
 /**
- * Sail the live course with the real arrow-key controls until the race ends.
- * Points at each mark, tacking upwind when the mark is inside the no-go zone.
+ * Sail the live course (a race or the lesson) with the real arrow-key controls
+ * until it ends or `until` is satisfied. Points at each mark, tacking upwind
+ * when the mark is inside the no-go zone.
  */
-export async function sailCourse(frame: Frame, timeoutMs: number): Promise<void> {
+export async function sailCourse(
+	frame: Frame,
+	timeoutMs: number,
+	until: (probe: Probe) => boolean = () => false,
+): Promise<void> {
 	let tack = 1;
 	let held: string | null = null;
 	const deadline = Date.now() + timeoutMs;
 	while (Date.now() < deadline) {
 		const probe = await frame.evaluate(() => window.__regattaProbe?.() ?? null);
-		if (!probe || probe.mode !== "racing" || !probe.nextMark) break;
+		if (!probe || (probe.mode !== "racing" && probe.mode !== "lesson") || !probe.nextMark) break;
 		const p = probe as Probe;
+		if (until(p)) break;
 		const mark = p.nextMark!;
 		const bearing = Math.atan2(mark.x - p.x, mark.y - p.y);
 		let desired = bearing;

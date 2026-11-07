@@ -658,11 +658,11 @@
 
 .coach {
 	position: absolute;
-	top: calc(var(--safe-top) + 64px);
+	/* Below the mini-map, so it never overlaps it on a narrow phone. */
+	top: calc(var(--safe-top) + 18px + clamp(84px, 26vw, 118px));
 	left: 50%;
 	transform: translateX(-50%);
-	width: min(340px, calc(100% - 2 * var(--edge) - 2 * 84px));
-	min-width: 180px;
+	width: min(360px, calc(100% - 2 * var(--edge)));
 	padding: 10px 12px;
 	border-radius: 16px;
 	background: var(--chrome-bg);
@@ -803,4 +803,8 @@
 	.stage[data-phase="replay"] .gauge {
 		bottom: calc(var(--safe-bottom) + 76px);
 	}
+}
+
+.metric[hidden] {
+	display: none;
 }
