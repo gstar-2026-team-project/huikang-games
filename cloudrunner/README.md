@@ -1,0 +1,12 @@
+# Cloudrunner
+
+A thermal-gliding game over low-poly valleys. Your sailplane has no engine: it only ever comes down, unless you find rising air. Circle under a cloud to climb, then spend that height gliding to the next beacon. The air keeps changing while you fly: thermals build, drift with the wind and collapse, so the cloud you are heading for may be gone when you get there and you have to pick another.
+
+- **Daily task:** four turnpoints, the same for every pilot each day (UTC). The flight ends when you reach the last beacon, touch the ground, or after six minutes. The day's leaderboard ranks the most turnpoints first, then the fastest time, and your friends hear about it when you take the lead.
+- **Free flight:** a fresh valley every time and beacons without end. It is over when you land out; the board keeps your most turnpoints in one flight.
+- **Controls:** a thumb stick banks and pitches the glider. Push the nose down to trade height for speed, ease it up to slow down and turn tighter; let go and the glider holds its speed. On a keyboard, arrow keys or WASD steer and Space launches. A button flips the stick's up and down.
+- **How thermals work:** each thermal is a column of rising air with a cloud on top. The lift is strongest in the core, marked by rings that rise up the column, and falls to nothing at the edge. Stay inside the rings and the variometer turns green. A thermal builds for a few seconds, lasts under a minute, then fades, and its cloud thins out as it dies. Lift stops at the cloud base, about 1,100 m up. Every flight starts with one good thermal straight ahead.
+- **Turnpoints:** a beacon is a pillar of light with a circle on the ground and another at your own height. Fly within the circle at any height to take it. An arrow at the edge of the screen points to the next one when it is out of view, and the map shows the thermals around you, the next beacons and the route.
+- **The glide:** about 8 metres forward for every metre down at 144 km/h, and much worse when you dive. From the launch height you cannot reach the last beacon without climbing at least twice.
+- **Ideal path:** turn on "Ideal path" beside the stick to see what an autopilot would do right now: a dashed line to the thermal it would use, up it, and on to the next beacon.
+- **Your progress is saved:** daily bests and your free-flight record stay with you, and a flight cut short by closing the app still counts.

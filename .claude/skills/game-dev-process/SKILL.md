@@ -6,7 +6,7 @@ description: How to develop, test, play, and ship a game in this repository, end
 # Game development process
 
 Each game is a Joiner tile in its own top-level folder (`sailrunner/`,
-`skyrunner/`) and ships to two places: the Joiner tile, and a single-player web
+`skyrunner/`, `cloudrunner/`) and ships to two places: the Joiner tile, and a single-player web
 build on GitHub Pages. A change is done when it is tested, played, committed to
 `main`, live on Pages, and uploaded to Joiner.
 

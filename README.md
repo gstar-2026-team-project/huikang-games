@@ -11,6 +11,7 @@ Play them in the browser at
 | --- | --- | --- |
 | [`sailrunner/`](sailrunner/) | **Sailrunner**: race a sailboat around a new buoy course every day, with a sailing lesson, a shared leaderboard, and replays. | [sailrunner/](https://gstar-2026-team-project.github.io/huikang-games/sailrunner/) |
 | [`skyrunner/`](skyrunner/) | **Skyrunner**: fly a plane through golden rings, with a daily challenge, twelve star-rated canyon levels, and endless free flight. | [skyrunner/](https://gstar-2026-team-project.github.io/huikang-games/skyrunner/) |
+| [`cloudrunner/`](cloudrunner/) | **Cloudrunner**: fly an unpowered glider, circling in thermals that appear and die to reach a daily set of beacons, or as many as you can in free flight. | [cloudrunner/](https://gstar-2026-team-project.github.io/huikang-games/cloudrunner/) |
 
 The web versions run without Joiner, so they are single-player: times and
 progress are saved in the browser only, with no shared leaderboard.
@@ -23,7 +24,7 @@ The landing page passes it on to the game you open.
 ## Working on a game
 
 ```bash
-cd sailrunner       # or skyrunner
+cd sailrunner       # or skyrunner, cloudrunner
 bun install
 bun run dev        # live preview inside a local Joiner host
 bun run build:web  # standalone web build in dist-web/

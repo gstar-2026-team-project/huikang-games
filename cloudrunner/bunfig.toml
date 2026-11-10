@@ -1,0 +1,8 @@
+[test]
+preload = ["fake-indexeddb/auto", "./tests/setup-dom.ts"]
+coverage = true
+coverageDir = "coverage"
+coverageReporter = ["lcov"]
+
+[test.reporter]
+junit = "junit.xml"

@@ -1,0 +1,19 @@
+{
+	"$schema": "https://poe-tiles-docs.pages.dev/schemas/poe-tile/v10.json",
+	"handle": "cloudrunner-k7q2",
+	"displayName": "Cloudrunner",
+	"shortDescription": "Fly a glider with no engine: circle under clouds to climb, then race to the beacons before the lift moves on. Daily task and free flight.",
+	"longDescription": "./README.md",
+	"players": {
+		"min": 1
+	},
+	"instancing": "per-context",
+	"runtimeBundle": {
+		"dir": "dist"
+	},
+	"sourceBundle": {
+		"dir": ".",
+		"visibility": "public"
+	},
+	"profilePicture": "./assets/screenshot.png"
+}

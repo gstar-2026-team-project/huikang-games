@@ -1,0 +1,24 @@
+node_modules/
+
+# Build output
+dist/
+dist-web/
+
+# Local CLI credential filenames. The CLI normally reads them from ~/.poe-tiles/.
+.poe-tiles-token
+poe-tiles-api-key
+poe-tiles-session-token
+
+# Keep app metadata images trackable. Commit any local profilePicture file
+# referenced by .poe-tile.json.
+.poe-tile-change-summary
+
+# Local verification screenshots and recordings (scripts/visual-check.ts).
+# Also excluded from the published source bundle, so nothing here counts
+# toward its size limit.
+.visual-checks/
+
+# Test output
+coverage/
+junit.xml
+test-results/
