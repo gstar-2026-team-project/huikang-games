@@ -7,11 +7,11 @@ import { buildJet, JET_NOZZLE_Z } from "./jet-model";
 import type { Paint, Tri, V3 } from "./model-kit";
 import { buildProp } from "./prop-model";
 import type { Palette, RGB } from "./palette";
+import { fireSprite, glowSprite, smokeSprite } from "./sprites";
 
 const tmp = [0, 0, 0];
 /** Drawn size relative to the model's metres, so the jet reads on a phone from the chase camera. */
 const JET_SCALE = 1.3;
-const BURST_COLORS = ["#ffb03b", "#ff6a2b", "#5a5a5a"];
 const SUN: V3 = (() => {
 	const v = [-0.45, 0.8, 0.35];
 	const l = Math.hypot(v[0] ?? 0, v[1] ?? 0, v[2] ?? 0);
@@ -60,7 +60,7 @@ export function drawPlane(ctx: CanvasRenderingContext2D, cam: Camera, sim: Sim, 
 	cam.point(p.x, p.y, p.z, tmp);
 	if ((tmp[2] ?? 0) < NEAR) return;
 	if (sim.phase === "crashing" || (sim.phase === "ended" && sim.endReason === "ground")) {
-		drawBurst(ctx, sim, cam.sx(tmp), cam.sy(tmp), cam.F / (tmp[2] ?? 1));
+		drawBurst(ctx, sim, pal, cam.sx(tmp), cam.sy(tmp), cam.F / (tmp[2] ?? 1));
 		return;
 	}
 	const flying = restT === null && sim.phase === "flying";
@@ -105,7 +105,8 @@ export function drawPlane(ctx: CanvasRenderingContext2D, cam: Camera, sim: Sim, 
 		cam.point(b[0], b[1], b[2], cam3, 3);
 		cam.point(c[0], c[1], c[2], cam3, 6);
 		if ((cam3[2] ?? 0) < NEAR || (cam3[5] ?? 0) < NEAR || (cam3[8] ?? 0) < NEAR) continue;
-		const lit = 0.55 + 0.5 * Math.max(0, nx * SUN[0] + ny * SUN[1] + nz * SUN[2]);
+		// Sun, plus a cool fill from the sky above, so the undersides stay readable but darker.
+		const lit = 0.46 + 0.56 * Math.max(0, nx * SUN[0] + ny * SUN[1] + nz * SUN[2]) + 0.1 * Math.max(0, ny);
 		const col = paintOf(pal, t.paint);
 		const disc = t.paint === "disc";
 		faces.push({
@@ -187,30 +188,54 @@ function drawAfterburner(ctx: CanvasRenderingContext2D, cam: Camera, sim: Sim, t
 	if ((cam3[2] ?? 0) < NEAR || (cam3[5] ?? 0) < NEAR || (cam3[8] ?? 0) < NEAR) return;
 	const cx = cam.sx(cam3, 0), cy = cam.sy(cam3, 0), tx = cam.sx(cam3, 3), ty = cam.sy(cam3, 3);
 	const rad = Math.hypot(cam.sx(cam3, 6) - cx, cam.sy(cam3, 6) - cy) * 0.8;
-	const hot = 0.3 + sim.throttle * 0.5;
-	ctx.globalAlpha = hot;
-	ctx.fillStyle = "#ff8a2a";
+	const hot = 0.35 + sim.throttle * 0.5;
+	const mx = (cx + tx) / 2, my = (cy + ty) / 2, ang = Math.atan2(ty - cy, tx - cx), len2 = Math.hypot(tx - cx, ty - cy) / 2;
+	// Outer orange plume, a hotter yellow core and a white-hot nozzle.
+	ctx.globalAlpha = hot * 0.7;
+	ctx.fillStyle = "#ff9636";
 	ctx.beginPath();
-	ctx.ellipse((cx + tx) / 2, (cy + ty) / 2, Math.max(rad, Math.hypot(tx - cx, ty - cy) / 2), rad, Math.atan2(ty - cy, tx - cx), 0, 6.283);
+	ctx.ellipse(mx, my, Math.max(rad, len2), rad, ang, 0, 6.283);
 	ctx.fill();
-	ctx.fillStyle = "#ffe08a";
+	ctx.globalAlpha = hot;
+	ctx.fillStyle = "#ffd25a";
 	ctx.beginPath();
-	ctx.arc(cx, cy, rad * 0.7, 0, 6.283);
+	ctx.ellipse(cx + (tx - cx) * 0.25, cy + (ty - cy) * 0.25, Math.max(rad * 0.7, len2 * 0.5), rad * 0.62, ang, 0, 6.283);
+	ctx.fill();
+	ctx.globalAlpha = Math.min(1, hot + 0.2);
+	ctx.fillStyle = "#fff6dc";
+	ctx.beginPath();
+	ctx.arc(cx, cy, rad * 0.42, 0, 6.283);
 	ctx.fill();
 	ctx.globalAlpha = 1;
 }
 
-function drawBurst(ctx: CanvasRenderingContext2D, sim: Sim, px: number, py: number, s: number): void {
+/**
+ * The crash: a flash, then fireballs flung out and falling, and smoke that
+ * rises and spreads, all from baked sprites. Driven by the sim's crash clock.
+ */
+function drawBurst(ctx: CanvasRenderingContext2D, sim: Sim, pal: Palette, px: number, py: number, s: number): void {
 	const t = Math.min(sim.crashT, CRASH_DURATION);
 	const fade = Math.max(0, 1 - t / CRASH_DURATION);
 	if (fade <= 0) return;
-	ctx.globalAlpha = fade;
-	for (const b of sim.burst) {
-		const d = t * 14 * b.s * s;
-		ctx.fillStyle = BURST_COLORS[b.c] ?? "#888";
-		ctx.beginPath();
-		ctx.arc(px + Math.cos(b.a) * d, py + Math.sin(b.a) * d - t * t * 8 * s, (1.4 - t * 0.6) * s * (b.c === 2 ? 1.6 : 1), 0, 6.283);
-		ctx.fill();
+	const flash = Math.max(0, 1 - t / 0.35);
+	if (flash > 0) {
+		const r = s * (10 + 26 * (1 - flash));
+		ctx.globalAlpha = flash * 0.85;
+		ctx.drawImage(glowSprite(pal, [255, 226, 150], "flash"), px - r, py - r, 2 * r, 2 * r);
+	}
+	const fire = fireSprite(pal), smoke = smokeSprite(pal);
+	// Smoke first, so the fire glows in front of it.
+	for (const pass of [2, 0]) {
+		for (const b of sim.burst) {
+			const isSmoke = b.c === 2;
+			if (isSmoke !== (pass === 2)) continue;
+			const d = t * 14 * b.s * s;
+			const x = px + Math.cos(b.a) * d;
+			const y = py + Math.sin(b.a) * d * 0.7 + (isSmoke ? -t * 10 * s : t * t * 6 * s);
+			const r = isSmoke ? (1.6 + t * 2.4) * s : (1.6 - t * 0.7) * s * (b.c === 1 ? 1.25 : 1);
+			ctx.globalAlpha = isSmoke ? fade * 0.8 : fade;
+			ctx.drawImage(isSmoke ? smoke : fire, x - r, y - r, 2 * r, 2 * r);
+		}
 	}
 	ctx.globalAlpha = 1;
 }

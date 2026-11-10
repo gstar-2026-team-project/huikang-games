@@ -32,16 +32,14 @@ export class Scene {
 		drawSky(ctx, cam, sim, pal);
 		items.length = 0;
 		queueTerrain(sim, cam, pal, items as QuadItem[]);
-		queueRings(sim, cam, pal, items as RingItem[]);
+		queueRings(sim, cam, items as RingItem[]);
 		queueClouds(sim, cam, items as CloudItem[]);
 		items.sort((a, b) => b.z - a.z);
 		ctx.lineJoin = "round";
 		for (const it of items) {
-			if (it.kind === 0) {
-				ctx.lineWidth = 1;
-				drawQuad(ctx, cam, it);
-			} else if (it.kind === 1) drawRing(ctx, cam, it);
-			else drawCloud(ctx, it, pal);
+			if (it.kind === 0) drawQuad(ctx, cam, it);
+			else if (it.kind === 1) drawRing(ctx, cam, it, pal);
+			else drawCloud(ctx, cam, it, pal);
 		}
 		if (showPath && sim.phase === "flying") drawIdealPath(ctx, cam, sim, pal);
 		drawPlane(ctx, cam, sim, pal, restT);
