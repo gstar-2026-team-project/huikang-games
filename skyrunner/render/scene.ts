@@ -2,7 +2,7 @@ import type { Sim } from "../game/flight";
 import { Camera } from "./camera";
 import type { Palette } from "./palette";
 import { drawPlane } from "./plane-draw";
-import { drawGateLabel, drawRing, drawRingArrow, queueRings, type RingItem } from "./rings-draw";
+import { drawGateLabel, drawIdealPath, drawRing, drawRingArrow, queueRings, type RingItem } from "./rings-draw";
 import { type CloudItem, drawCloud, drawSky, queueClouds } from "./sky";
 import { drawQuad, type QuadItem, queueTerrain } from "./terrain-draw";
 
@@ -24,7 +24,8 @@ export class Scene {
 		this.cam.resize(cssW, cssH);
 	}
 
-	draw(sim: Sim, pal: Palette, restT: number | null): void {
+	/** `showPath` overlays the ideal line through the next rings while flying. */
+	draw(sim: Sim, pal: Palette, restT: number | null, showPath = false): void {
 		const { ctx, cam, items } = this;
 		ctx.setTransform(this.ratio, 0, 0, this.ratio, 0, 0);
 		cam.follow(sim);
@@ -42,6 +43,7 @@ export class Scene {
 			} else if (it.kind === 1) drawRing(ctx, cam, it);
 			else drawCloud(ctx, it, pal);
 		}
+		if (showPath && sim.phase === "flying") drawIdealPath(ctx, cam, sim, pal);
 		drawPlane(ctx, cam, sim, pal, restT);
 		if (sim.phase === "flying") {
 			drawGateLabel(ctx, cam, sim, pal);

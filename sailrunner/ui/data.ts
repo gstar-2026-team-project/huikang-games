@@ -22,6 +22,7 @@ export function createDayReader(day: string) {
 			activeRun,
 			muted: prefs?.muted ?? false,
 			tutorialDone: prefs?.tutorialDone ?? false,
+			showPath: prefs?.showPath ?? false,
 			profiles: Object.fromEntries(profiles.map((p) => [p.userId, p])) as Record<string, PoeUserInfo>,
 		};
 	};

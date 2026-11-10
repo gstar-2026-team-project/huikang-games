@@ -8,7 +8,7 @@ import type { AppProps } from "./app-contract";
 import { SoundBoard } from "./audio";
 import { type DayData, playerName, type RunRow } from "./data";
 import { HudView, type Leader, useHudRefs } from "./HudView";
-import { Countdown, FinishBanner, type FinishInfo, HelpSheet, ReadyPanel, Toast } from "./Panels";
+import { FinishBanner, type FinishInfo, HelpSheet, ReadyPanel, Toast } from "./Panels";
 import { RaceController } from "./race-controller";
 import { nextReplaySpeed, ReplayBar, ReplayPicker } from "./ReplayPicker";
 import { SteerPads } from "./SteerPads";
@@ -18,7 +18,6 @@ import { ActionHint, CoachCard, LessonDone, padHint, useLesson } from "./Lesson"
 
 export type Phase =
 	| "ready"
-	| "countdown"
 	| "racing"
 	| "finished"
 	| "results"
@@ -31,7 +30,6 @@ export type Phase =
 const FINISH_BEAT_MS = 1700;
 export function Regatta({ store, poe, resumeAudioContext, suppressLongPressMagnifier, data }: AppProps & { data: DayData }) {
 	const [phase, setPhase] = useState<Phase>("ready");
-	const [count, setCount] = useState(3);
 	const [finish, setFinish] = useState<FinishInfo | null>(null);
 	const [help, setHelp] = useState(false);
 	const [replay, setReplay] = useState<{ run: RunRow; speed: number } | null>(null);
@@ -234,21 +232,15 @@ export function Regatta({ store, poe, resumeAudioContext, suppressLongPressMagni
 		canResume: () => controllerRef.current !== null,
 	});
 
+	// The race starts the moment the player asks for it; a second tap while the
+	// run id is still being minted must not start a second run.
+	const startingRef = useRef(false);
 	const startRace = useCallback(() => {
+		if (startingRef.current) return;
+		startingRef.current = true;
 		sound.unlock();
-		poe.haptics.impact("light");
-		setPhase("countdown");
-		setCount(3);
-		sound.play("tick");
-		const step = (n: number) => {
-			if (n > 0) {
-				setCount(n);
-				sound.play("tick");
-				later(() => step(n - 1), 1000);
-				return;
-			}
-			setCount(0);
-			void (async () => {
+		void (async () => {
+			try {
 				const runId = await store.makeUniqueId();
 				const race = createRace(course);
 				runRef.current = { runId, day: course.day };
@@ -262,10 +254,11 @@ export function Regatta({ store, poe, resumeAudioContext, suppressLongPressMagni
 						console.error(error);
 						showToast("Couldn't start the run. Check your connection.");
 					});
-			})();
-		};
-		later(() => step(2), 1000);
-	}, [sound, poe, store, course, later, showToast]);
+			} finally {
+				startingRef.current = false;
+			}
+		})();
+	}, [sound, poe, store, course, showToast]);
 
 	const restart = useCallback(() => {
 		const run = runRef.current;
@@ -304,6 +297,15 @@ export function Regatta({ store, poe, resumeAudioContext, suppressLongPressMagni
 		[poe, showToast],
 	);
 
+	const togglePath = useCallback(() => {
+		void store.mutate.setShowPath({ showPath: !data.showPath });
+	}, [store, data.showPath]);
+
+	// The controller draws the ideal path; the saved preference decides whether it does.
+	useEffect(() => {
+		controllerRef.current?.setShowPath(data.showPath);
+	}, [data.showPath, graphicsError]);
+
 	const toggleMute = useCallback(() => {
 		sound.unlock();
 		void store.mutate.setMuted({ muted: !data.muted });
@@ -311,13 +313,13 @@ export function Regatta({ store, poe, resumeAudioContext, suppressLongPressMagni
 
 	const top = data.runs[0];
 	const leader: Leader | null =
-		top && (phase === "racing" || phase === "ready" || phase === "countdown")
+		top && (phase === "racing" || phase === "ready")
 			? { profile: data.profiles[top.userId], timeMs: top.timeMs, isMe: top.userId === data.userId }
 			: null;
 	const myBest = data.runs.find((r) => r.userId === data.userId)?.timeMs ?? null;
 	const racing = phase === "racing";
 	const atHelm = racing || phase === "lesson";
-	const showGauge = atHelm || phase === "countdown" || phase === "replay" || phase === "finished";
+	const showGauge = atHelm || phase === "replay" || phase === "finished";
 
 	return (
 		<div ref={stageRef} className="stage" data-phase={phase} data-testid="stage">
@@ -327,9 +329,11 @@ export function Regatta({ store, poe, resumeAudioContext, suppressLongPressMagni
 					refs={hudRefs.refs}
 					showRace={showGauge}
 					muted={data.muted}
+					showPath={data.showPath}
 					leader={leader}
 					onHelp={() => setHelp(true)}
 					onMute={toggleMute}
+					onPath={togglePath}
 					onRestart={racing ? restart : null}
 				/>
 				{atHelm && (
@@ -355,7 +359,6 @@ export function Regatta({ store, poe, resumeAudioContext, suppressLongPressMagni
 				)}
 				{phase === "lesson" && <CoachCard step={lesson.step} cheer={lesson.cheer} onExit={goReady} />}
 				{phase === "lessonDone" && <LessonDone onRace={startRace} onAgain={lesson.start} />}
-				{phase === "countdown" && <Countdown value={count} />}
 				{phase === "finished" && finish && <FinishBanner info={finish} />}
 				{phase === "replay" && replay && (
 					<ReplayBar

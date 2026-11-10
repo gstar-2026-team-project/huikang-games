@@ -5,5 +5,5 @@ export const completeTutorial: TileMutator<"completeTutorial"> = async (ctx) => 
 	const prefs = ctx.privateOfUser(ctx.userId).table("prefs");
 	const current = await prefs.get("prefs");
 	if (current?.tutorialDone) return;
-	await prefs.set({ itemKey: "prefs", value: { muted: current?.muted ?? false, tutorialDone: true } });
+	await prefs.set({ itemKey: "prefs", value: { ...current, muted: current?.muted ?? false, tutorialDone: true } });
 };

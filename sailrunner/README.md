@@ -7,3 +7,7 @@ the chat races the same course, your best time goes on the day's leaderboard,
 and when you're done you can sit back and watch anyone's run as a replay.
 New to sailing? A one-minute lesson on the water teaches steering, stalling
 in irons, and tacking your way upwind.
+
+The map in the corner follows the leg you are sailing and shows the wind
+across the water and the no-go zone at your bow. Tap the compass to draw a
+suggested path through the buoys, tacks included.

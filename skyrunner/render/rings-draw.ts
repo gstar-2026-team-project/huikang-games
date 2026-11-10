@@ -1,6 +1,7 @@
 import { RING_FX_DURATION } from "../game/constants";
 import type { Ring } from "../game/course";
 import type { Sim } from "../game/flight";
+import { idealPath, PATH_BUFFER_LENGTH } from "../game/ideal-path";
 import type { Camera } from "./camera";
 import { NEAR } from "./camera";
 import type { Palette } from "./palette";
@@ -86,6 +87,31 @@ export function drawRingArrow(ctx: CanvasRenderingContext2D, cam: Camera, sim: S
 	ctx.fill();
 	ctx.stroke();
 	ctx.restore();
+}
+
+const pathWorld = new Float32Array(PATH_BUFFER_LENGTH);
+const pathCam = new Float32Array(PATH_BUFFER_LENGTH);
+
+/** The ideal line through the next rings, as dashes that thin with distance. */
+export function drawIdealPath(ctx: CanvasRenderingContext2D, cam: Camera, sim: Sim, pal: Palette): void {
+	const count = idealPath(sim.plane, sim.rings, sim.next, pathWorld);
+	for (let k = 0; k < count; k++) {
+		cam.point(pathWorld[k * 3] ?? 0, pathWorld[k * 3 + 1] ?? 0, pathWorld[k * 3 + 2] ?? 0, pathCam, k * 3);
+	}
+	ctx.strokeStyle = pal.planeWhite;
+	ctx.globalAlpha = 0.8;
+	ctx.lineCap = "round";
+	// Every other segment, so the line reads as dashes flowing toward the rings.
+	for (let k = 1; k + 1 < count; k += 2) {
+		const z0 = pathCam[k * 3 + 2] ?? 0, z1 = pathCam[k * 3 + 5] ?? 0;
+		if (z0 < NEAR || z1 < NEAR) continue;
+		ctx.lineWidth = Math.max(1.5, (1.6 * cam.F) / ((z0 + z1) / 2));
+		ctx.beginPath();
+		ctx.moveTo(cam.sx(pathCam, k * 3), cam.sy(pathCam, k * 3));
+		ctx.lineTo(cam.sx(pathCam, k * 3 + 3), cam.sy(pathCam, k * 3 + 3));
+		ctx.stroke();
+	}
+	ctx.globalAlpha = 1;
 }
 
 export function ringColor(pal: Palette, ring: Ring, next: boolean): string {

@@ -10,6 +10,7 @@ import type { BoatPose } from "../render/boat";
 import { Minimap, type MinimapColors, readMinimapColors } from "../render/minimap";
 import { SailingScene } from "../render/scene";
 import { type HudNodes, HudWriter } from "./hud-writer";
+import { IdealPath } from "./ideal-path";
 
 type Mode = "ready" | "racing" | "lesson" | "replay" | "paused";
 
@@ -87,6 +88,7 @@ export class RaceController {
 	private hudWriter: HudWriter;
 	private minimapColors: MinimapColors;
 	private readyPose: BoatPose = { x: 0, y: 0, heading: 0, speed: 0 };
+	private idealPath = new IdealPath();
 
 	constructor(
 		canvas: HTMLCanvasElement,
@@ -140,7 +142,28 @@ export class RaceController {
 		this.applyCourse(course);
 		this.readyPose = { ...createRace(course).boat };
 		this.snapCamera = true;
+		this.planPath();
 		this.wake();
+	}
+
+	/** Show or hide the computed ideal path on the water and the map. */
+	setShowPath(show: boolean): void {
+		if (show === this.idealPath.shown) return;
+		this.idealPath.shown = show;
+		this.planPath();
+		this.wake();
+	}
+
+	/** Only the start line and a live race have an ideal path; the lesson draws its own guide. */
+	private planPath(): void {
+		const course = this.course;
+		if (this.idealPath.shown && course && !this.lesson && (this.mode === "ready" || this.mode === "racing")) {
+			const view = this.currentView();
+			this.scene.setGuide(this.idealPath.plan(course, view.pose, view.nextMark, view.ms));
+			return;
+		}
+		if (this.idealPath.route.length > 0 && !this.lesson) this.scene.setGuide([]);
+		this.idealPath.clear();
 	}
 
 	private applyCourse(course: Course): void {
@@ -168,6 +191,8 @@ export class RaceController {
 		this.replay = null;
 		this.lesson = null;
 		this.snapCamera = true;
+		this.idealPath.clear();
+		this.planPath();
 		this.wake();
 	}
 
@@ -179,12 +204,15 @@ export class RaceController {
 		this.mode = "racing";
 		this.accumulator = 0;
 		this.snapCamera = true;
+		this.idealPath.clear();
+		this.planPath();
 		this.wake();
 	}
 
 	/** Freeze the scene on the current pose (finish moment, overlays). */
 	pause(): void {
 		this.mode = "paused";
+		this.planPath();
 		this.wake();
 	}
 
@@ -195,6 +223,7 @@ export class RaceController {
 		this.lessonPlanVersion = this.lesson.planVersion;
 		this.lessonAction = this.lesson.action;
 		this.events.onLessonAction(this.lesson.action);
+		this.idealPath.clear();
 		this.applyCourse(this.lesson.course);
 		this.scene.setGuide(this.lesson.guide);
 		this.race = null;
@@ -207,6 +236,7 @@ export class RaceController {
 
 	startReplay(run: ReplayRun, speed: number): void {
 		this.scene.setGuide([]);
+		this.idealPath.clear();
 		this.replay = { ...run, ms: 0, speed };
 		this.race = null;
 		this.lesson = null;
@@ -285,6 +315,7 @@ export class RaceController {
 			while (this.accumulator >= SIM_DT && this.mode === "racing") {
 				this.accumulator -= SIM_DT;
 				const event = stepRace(course, this.race, this.steer());
+				if (this.idealPath.tick() && this.mode === "racing") this.planPath();
 				if (event) this.events.onRaceEvent(event, this.race);
 			}
 		} else if (this.mode === "lesson" && this.lesson) {
@@ -357,7 +388,8 @@ export class RaceController {
 		});
 		this.snapCamera = false;
 		if (!this.steering() || this.frameCount % MINIMAP_EVERY_N_FRAMES === 0) {
-			this.minimap.draw(course, view.pose, view.nextMark, wind, view.trace, this.minimapColors, this.lesson?.guide);
+			const guide = this.lesson?.guide ?? this.idealPath.route;
+			this.minimap.draw(course, view.pose, view.nextMark, wind, view.trace, this.minimapColors, guide, this.lesson !== null);
 		}
 		this.frameCount++;
 		this.hudWriter.write({ course, ...view, wind, lesson: this.lesson !== null, steering: this.steering() });

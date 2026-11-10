@@ -46,14 +46,16 @@ interface Props {
 	refs: HudRefs;
 	showRace: boolean;
 	muted: boolean;
+	showPath: boolean;
 	leader: Leader | null;
 	onHelp(): void;
 	onMute(): void;
+	onPath(): void;
 	onRestart: (() => void) | null;
 }
 
 /** Always-mounted HUD; the loop writes the live values straight into these nodes. */
-export function HudView({ refs, showRace, muted, leader, onHelp, onMute, onRestart }: Props) {
+export function HudView({ refs, showRace, muted, showPath, leader, onHelp, onMute, onPath, onRestart }: Props) {
 	return (
 		<>
 			<div className="hud-top">
@@ -84,6 +86,16 @@ export function HudView({ refs, showRace, muted, leader, onHelp, onMute, onResta
 						aria-pressed={muted}
 					>
 						{muted ? "🔇" : "🔊"}
+					</button>
+					<button
+						type="button"
+						className="icon-button"
+						onClick={onPath}
+						aria-label={showPath ? "Hide ideal path" : "Show ideal path"}
+						aria-pressed={showPath}
+						data-testid="path-toggle"
+					>
+						🧭
 					</button>
 					{onRestart && (
 						<button type="button" className="icon-button" onClick={onRestart} aria-label="Restart run">

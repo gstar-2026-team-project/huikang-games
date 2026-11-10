@@ -54,6 +54,9 @@ test.describe("standalone web build", () => {
 
 		await page.locator("[data-testid=mode-daily]").click();
 		await expect(root).toHaveAttribute("data-screen", "play");
+		// The ideal path through the next rings can be switched on in flight.
+		await page.locator("[data-testid=path-toggle]").click();
+		await expect(page.locator("[data-testid=path-toggle]")).toHaveText("Ideal path: on");
 		// Hands off, the plane flies level through the first ring.
 		await expect(page.locator("[data-testid=rings]")).toHaveText("1", { timeout: 15_000 });
 		// Then dive into the ground to end the flight.

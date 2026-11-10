@@ -15,6 +15,7 @@ export const SHELL_HTML = `
 <div id="err" role="alert" hidden></div>
 <div id="controls">
   <button id="invert" type="button">Drag up: climb</button>
+  <button id="path" type="button" data-testid="path-toggle" aria-pressed="false">Ideal path: off</button>
   <div id="stickZone" aria-label="Steering stick"><div id="knob"></div></div>
   <div id="throttle" aria-label="Throttle"><div id="thrFill"></div><div id="thrLabel">THR</div></div>
   <div id="hint">Fly through the golden rings</div>
@@ -47,6 +48,7 @@ export interface ShellRefs {
 	err: HTMLElement;
 	controls: HTMLElement;
 	invert: HTMLButtonElement;
+	path: HTMLButtonElement;
 	stickZone: HTMLElement;
 	knob: HTMLElement;
 	throttle: HTMLElement;
@@ -84,6 +86,7 @@ export function mountShell(root: HTMLElement): ShellRefs {
 		err: q("#err"),
 		controls: q("#controls"),
 		invert: q<HTMLButtonElement>("#invert"),
+		path: q<HTMLButtonElement>("#path"),
 		stickZone: q("#stickZone"),
 		knob: q("#knob"),
 		throttle: q("#throttle"),

@@ -31,6 +31,13 @@ test("the first ring is straight ahead and level, so hands-off flying scores it"
 	}
 });
 
+test("a flight takes off at full throttle and accelerates from cruise speed", () => {
+	const { sim } = fly(4, 6);
+	expect(createSim(4).throttle).toBe(1);
+	expect(createSim(4).plane.v).toBe(CRUISE_SPEED);
+	expect(sim.plane.v).toBeGreaterThan(CRUISE_SPEED + 15);
+});
+
 test("a ring counts once, and only after the plane crosses it", () => {
 	const sim = createSim(5);
 	const events: SimEvent[] = [];
@@ -220,7 +227,7 @@ test("the daily run is a fixed 40-second clock: rings add no time, and the last 
 	for (let i = 0; i < 60 * 9; i++) stepSim(sim, NO_CONTROLS, DT, events);
 	expect(sim.score).toBe(1);
 	expect(sim.timeLeft).toBeCloseTo(DAILY_SECONDS - 9, 5);
-	expect(sim.lastRingAt).toBeGreaterThan(5);
+	expect(sim.lastRingAt).toBeGreaterThan(3);
 	expect(sim.lastRingAt).toBeLessThan(9);
 	expect(decodeDailyScore(dailyScore(12, 31.4))).toEqual({ rings: 12, seconds: 31.4 });
 	expect(dailyScore(12, 39.9)).toBeGreaterThan(dailyScore(11, 1));

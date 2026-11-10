@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { NO_GO_ANGLE } from "./constants";
-import { coachAction, planRoute, TACK_ANGLE } from "./coach";
+import { coachAction, planCourse, planRoute, TACK_ANGLE } from "./coach";
 
 const DEG = Math.PI / 180;
 const wind = 0; // from the north
@@ -68,5 +68,30 @@ describe("coachAction", () => {
 	});
 	test("crossing downwind is just a turn, not a tack", () => {
 		expect(coachAction(boat(150), -150 * DEG, wind).kind).toBe("turn");
+	});
+});
+
+describe("planCourse", () => {
+	test("runs from the boat through every remaining buoy, tacking only on upwind legs", () => {
+		const boat = { x: 0, y: 0, heading: 90 * DEG, speed: 10 };
+		const across = { x: 100, y: 0 };
+		const upwind = { x: 100, y: 150 };
+		const { route } = planCourse(boat, [across, upwind], wind, 1);
+		// Straight across the wind, then one corner on the way upwind.
+		expect(route).toHaveLength(4);
+		expect(route[0]).toEqual({ x: 0, y: 0 });
+		expect(route[1]).toEqual(across);
+		expect(route[3]).toEqual(upwind);
+		// Every leg is outside the no-go zone.
+		for (let i = 1; i < route.length; i++) {
+			const from = route[i - 1]!;
+			const to = route[i]!;
+			const heading = Math.atan2(to.x - from.x, to.y - from.y);
+			expect(Math.abs(heading - wind)).toBeGreaterThan(NO_GO_ANGLE);
+		}
+	});
+
+	test("has nothing to draw once every buoy is rounded", () => {
+		expect(planCourse({ x: 0, y: 0, heading: 0, speed: 0 }, [], wind, -1)).toEqual({ route: [], side: -1 });
 	});
 });

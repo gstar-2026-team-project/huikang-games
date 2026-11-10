@@ -44,6 +44,12 @@ test("opens on the mode menu, shows the daily score to beat, and lists the level
 			expect(q("rival")).toHaveTextContent("To beat: Alice · 3");
 		});
 
+		// The ideal-path overlay is off until the pilot turns it on.
+		expect(q("path-toggle")).toHaveTextContent("Ideal path: off");
+		q("path-toggle")?.click();
+		expect(q("path-toggle")).toHaveTextContent("Ideal path: on");
+		expect(q("path-toggle")?.getAttribute("aria-pressed")).toBe("true");
+
 		// The level grid: every level open from the start.
 		q("mode-levels")?.click();
 		await waitFor(() => expect(container.dataset.screen).toBe("levels"));

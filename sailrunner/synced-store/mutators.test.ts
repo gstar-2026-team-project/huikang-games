@@ -145,4 +145,19 @@ describe("in-progress runs", () => {
 		const reloaded = await harness!.createClient({ userId: "alice" });
 		expect(await reloaded.store.query(read)).toEqual({ muted: true, tutorialDone: true });
 	});
+
+	test("the ideal-path choice is saved with the other preferences and survives them changing", async () => {
+		const { alice, bob } = await setup();
+		const read = (ctx: AppReadContext) => ctx.privateOfUser(ctx.userId).table("prefs").get("prefs");
+		// Turning it on first creates the preferences with sound left on.
+		await (await alice.mutate.setShowPath({ showPath: true })).confirmed;
+		expect(await alice.query(read)).toEqual({ muted: false, showPath: true });
+		expect(await bob.query(read)).toBeUndefined();
+		await (await alice.mutate.completeTutorial({})).confirmed;
+		await (await alice.mutate.setMuted({ muted: true })).confirmed;
+		expect(await alice.query(read)).toEqual({ muted: true, tutorialDone: true, showPath: true });
+		await (await alice.mutate.setShowPath({ showPath: false })).confirmed;
+		const reloaded = await harness!.createClient({ userId: "alice" });
+		expect(await reloaded.store.query(read)).toEqual({ muted: true, tutorialDone: true, showPath: false });
+	});
 });

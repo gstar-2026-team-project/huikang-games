@@ -54,8 +54,15 @@ test.describe("standalone web build", () => {
 		await expect(page.locator('[data-testid="start-lesson"]')).toBeVisible();
 		await expect(page.getByRole("button", { name: /Leaderboard/ })).toHaveCount(0);
 
+		// The ideal path is off until asked for, and the choice is saved.
+		const pathToggle = page.locator('[data-testid="path-toggle"]');
+		await expect(pathToggle).toHaveAttribute("aria-pressed", "false");
+		await pathToggle.click();
+		await expect(pathToggle).toHaveAttribute("aria-pressed", "true");
+
+		// The race starts at once: no countdown.
 		await page.locator('[data-testid="start-race"]').click();
-		await expect(page.locator('[data-testid="pad-left"]')).toBeVisible({ timeout: 8_000 });
+		await expect(page.locator('[data-testid="pad-left"]')).toBeVisible({ timeout: 2_000 });
 		await sailCourse(frame, 200_000);
 
 		const banner = page.locator('[data-testid="finish-banner"]');
@@ -71,6 +78,7 @@ test.describe("standalone web build", () => {
 
 		await page.reload();
 		await expect(page.locator(".ready-meta")).toContainText(`Your best ${time}`, { timeout: 15_000 });
+		await expect(pathToggle).toHaveAttribute("aria-pressed", "true");
 
 		await page.locator('[data-testid="open-replays"]').click();
 		await page.locator('[data-testid="watch-local"]').click();

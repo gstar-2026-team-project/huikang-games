@@ -23,12 +23,13 @@ export interface LocalState {
 	activeRun: ActiveRun | null;
 	muted: boolean;
 	tutorialDone: boolean;
+	showPath: boolean;
 }
 
 /** The slice of the browser Storage API this store needs. */
 export type StorageLike = Pick<Storage, "getItem" | "setItem">;
 
-const EMPTY: LocalState = { runs: [], activeRun: null, muted: false, tutorialDone: false };
+const EMPTY: LocalState = { runs: [], activeRun: null, muted: false, tutorialDone: false, showPath: false };
 const PROFILE: PoeUserInfo = { userId: LOCAL_USER_ID, displayName: "You", profilePicture: "" };
 
 function load(storage: StorageLike | null): LocalState {
@@ -41,6 +42,7 @@ function load(storage: StorageLike | null): LocalState {
 			activeRun: state.activeRun ?? null,
 			muted: state.muted === true,
 			tutorialDone: state.tutorialDone === true,
+			showPath: state.showPath === true,
 		};
 	} catch {
 		// Blocked or corrupt storage: start fresh rather than fail to load.
@@ -159,6 +161,10 @@ export class LocalStore {
 		this.update({ muted: input.muted });
 	}
 
+	setShowPath(input: Input<"setShowPath">): void {
+		this.update({ showPath: input.showPath });
+	}
+
 	/** The subset of the synced-store client the UI calls, backed by this store. */
 	client(): AppStoreClient {
 		const run = <T>(action: (input: T) => void) => async (input: T) => action(input);
@@ -173,6 +179,7 @@ export class LocalStore {
 				abandonRun: run<Input<"abandonRun">>((input) => this.abandonRun(input)),
 				completeTutorial: run<Input<"completeTutorial">>(() => this.completeTutorial()),
 				setMuted: run<Input<"setMuted">>((input) => this.setMuted(input)),
+				setShowPath: run<Input<"setShowPath">>((input) => this.setShowPath(input)),
 			},
 		};
 		// Only these members are used by the UI; the rest of the SDK client
@@ -192,6 +199,7 @@ export function toDayData(state: LocalState, day: string): DayData {
 		activeRun: state.activeRun ?? undefined,
 		muted: state.muted,
 		tutorialDone: state.tutorialDone,
+		showPath: state.showPath,
 		profiles: { [LOCAL_USER_ID]: PROFILE },
 	};
 }

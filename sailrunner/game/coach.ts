@@ -62,6 +62,26 @@ export function planRoute(boat: Boat, target: Point, wind: number, prevSide: Sid
 	return { route: [{ x: boat.x, y: boat.y }, corner, target], heading, side };
 }
 
+/**
+ * A good route from the boat through every remaining buoy, in order: the first
+ * leg from where the boat is now, each later leg from the buoy before it.
+ */
+export function planCourse(boat: Boat, marks: readonly Point[], wind: number, prevSide: Side): { route: Point[]; side: Side } {
+	const first = marks[0];
+	if (!first) return { route: [], side: prevSide };
+	const plan = planRoute(boat, first, wind, prevSide);
+	const route = [...plan.route];
+	let from = first;
+	for (const mark of marks.slice(1)) {
+		// Leaving a buoy, the boat is taken to be pointing at the next one.
+		const heading = Math.atan2(mark.x - from.x, mark.y - from.y);
+		const leg = planRoute({ x: from.x, y: from.y, heading, speed: boat.speed }, mark, wind, plan.side);
+		route.push(...leg.route.slice(1));
+		from = mark;
+	}
+	return { route, side: plan.side };
+}
+
 /** What to do with the helm to follow `heading` from the boat's current heading. */
 export function coachAction(boat: Boat, heading: number, wind: number): CoachAction {
 	const error = normalizeAngle(heading - boat.heading);

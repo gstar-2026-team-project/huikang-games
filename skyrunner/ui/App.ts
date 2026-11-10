@@ -40,6 +40,16 @@ export function mountApp(root: HTMLElement, props: AppProps): () => void {
 	const darkQ = window.matchMedia?.("(prefers-color-scheme: dark)");
 	const palette = () => (darkQ?.matches ? PALETTES.dark : PALETTES.light);
 
+	// The ideal line through the next rings is a view option, off until asked for.
+	let showPath = false;
+	const onPathToggle = () => {
+		showPath = !showPath;
+		ui.path.textContent = showPath ? "Ideal path: on" : "Ideal path: off";
+		ui.path.setAttribute("aria-pressed", String(showPath));
+		loop.wake();
+	};
+	ui.path.addEventListener("click", onPathToggle);
+	cleanups.push(() => ui.path.removeEventListener("click", onPathToggle));
 	const resize = () => {
 		const ratio = budget?.defaults.pixelRatio ?? Math.min(2, window.devicePixelRatio || 1);
 		scene?.resize(ui.view.clientWidth || window.innerWidth, ui.view.clientHeight || window.innerHeight, ratio);
@@ -52,7 +62,7 @@ export function mountApp(root: HTMLElement, props: AppProps): () => void {
 			step: (dt) => flight.step(dt),
 			render: (dt, nowMs) => {
 				const playing = flight.screen === "play";
-				scene?.draw(flight.sim, palette(), playing ? null : nowMs / 1000);
+				scene?.draw(flight.sim, palette(), playing ? null : nowMs / 1000, showPath && playing);
 				if (playing) minimap.draw(flight.sim, palette(), darkQ?.matches ? "dark" : "light");
 				hud.update(flight.sim, playing && flight.sim.phase === "flying", input.knob, dt);
 			},

@@ -81,9 +81,14 @@ describe("local store", () => {
 		const unsubscribe = local.subscribe(() => notified++);
 		await local.client().mutate.setMuted({ muted: true });
 		await local.client().mutate.completeTutorial({});
+		await local.client().mutate.setShowPath({ showPath: true });
 		unsubscribe();
-		expect(notified).toBe(2);
-		expect(toDayData(new LocalStore(storage).getState(), DAY)).toMatchObject({ muted: true, tutorialDone: true });
+		expect(notified).toBe(3);
+		expect(toDayData(new LocalStore(storage).getState(), DAY)).toMatchObject({
+			muted: true,
+			tutorialDone: true,
+			showPath: true,
+		});
 
 		// No storage at all still gives a working in-memory session.
 		const memoryOnly = new LocalStore(null);

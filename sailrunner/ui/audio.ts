@@ -3,7 +3,7 @@ import type { resumeAudioContext as ResumeAudioContext } from "poe-tiles-sdk/v1/
 /** Peak gain for every cue: loud enough to carry on a phone speaker, never startling. */
 const CUE_PEAK = 0.22;
 
-export type Cue = "tick" | "horn" | "mark" | "finish" | "timeout";
+export type Cue = "horn" | "mark" | "finish" | "timeout";
 
 /** Small synthesized cue set; created lazily from the first user gesture. */
 export class SoundBoard {
@@ -34,9 +34,6 @@ export class SoundBoard {
 		const t = ctx.currentTime;
 		const jitter = 1 + (Math.random() - 0.5) * 0.02;
 		switch (cue) {
-			case "tick":
-				this.tone(ctx, 660 * jitter, t, 0.09, "square", 0.5);
-				break;
 			case "horn":
 				this.tone(ctx, 220, t, 0.7, "sawtooth", 0.6);
 				this.tone(ctx, 330, t, 0.7, "sawtooth", 0.35);

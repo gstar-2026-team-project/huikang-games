@@ -1,5 +1,7 @@
+import { NO_GO_ANGLE } from "../game/constants";
 import type { Course, Point } from "../game/course";
 import type { BoatPose } from "./boat";
+import { easeView, fitView, focusPoints, type MapView } from "./minimap-view";
 
 export interface MinimapColors {
 	sea: string;
@@ -14,14 +16,23 @@ export interface MinimapColors {
 }
 
 const PADDING = 9;
-/** Smallest area the map shows, so a lone buoy (the lesson) is not zoomed absurdly. */
-const MIN_SPAN = 320;
+/** How quickly the view glides to a new leg (per second; higher is snappier). */
+const VIEW_EASE_RATE = 4;
+/** Where the wind arrows sit across the map, as fractions of its size. */
+const WIND_GRID = [0.2, 0.5, 0.8];
+/** Radius of the no-go wedge drawn at the boat, in CSS pixels. */
+const NO_GO_RADIUS = 22;
 
-/** North-up overview of the whole course with the boat, its track, and the wind. */
+/**
+ * North-up chart of the leg being sailed: the boat, its track, the next buoy,
+ * the wind across the water, and the no-go zone the boat cannot point into.
+ */
 export class Minimap {
 	private ctx: CanvasRenderingContext2D | null;
 	private size = 0;
-	private bounds = { minX: 0, minY: 0, scale: 1 };
+	/** Null until the first draw of a course, which snaps instead of gliding. */
+	private view: MapView | null = null;
+	private lastDrawMs = 0;
 
 	constructor(
 		private canvas: HTMLCanvasElement,
@@ -38,26 +49,33 @@ export class Minimap {
 		this.ctx?.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
 	}
 
-	setCourse(course: Course): void {
-		const xs = [course.start.x, ...course.marks.map((m) => m.x)];
-		const ys = [course.start.y, ...course.marks.map((m) => m.y)];
-		const minX = Math.min(...xs);
-		const minY = Math.min(...ys);
-		const span = Math.max(Math.max(...xs) - minX, Math.max(...ys) - minY, MIN_SPAN);
-		// Leave margin so a boat sailing wide of the course stays on the map.
-		const margin = span * 0.18;
-		this.bounds = {
-			minX: minX - margin,
-			minY: minY - margin,
-			scale: 1 / (span + margin * 2),
-		};
+	setCourse(_course: Course): void {
+		this.view = null;
 	}
 
+	/** Glide the view toward the boat, its target and the leg between them. */
+	private updateView(target: MapView): MapView {
+		const now = performance.now();
+		const dt = Math.min(0.25, Math.max(0, (now - this.lastDrawMs) / 1000));
+		this.lastDrawMs = now;
+		this.view = this.view ? easeView(this.view, target, 1 - Math.exp(-dt * VIEW_EASE_RATE)) : target;
+		return this.view;
+	}
+
+	/** World position to map pixels; may fall outside the map. */
 	private project(x: number, y: number): [number, number] {
+		const view = this.view ?? { cx: 0, cy: 0, span: 1 };
 		const inner = this.size - PADDING * 2;
-		const px = PADDING + (x - this.bounds.minX) * this.bounds.scale * inner;
-		const py = this.size - PADDING - (y - this.bounds.minY) * this.bounds.scale * inner;
-		const clamp = (v: number) => Math.max(3, Math.min(this.size - 3, v));
+		return [
+			this.size / 2 + ((x - view.cx) / view.span) * inner,
+			this.size / 2 - ((y - view.cy) / view.span) * inner,
+		];
+	}
+
+	/** Like `project`, but pinned to the map's edge so off-map buoys still show their direction. */
+	private projectPinned(x: number, y: number): [number, number] {
+		const clamp = (v: number) => Math.max(4, Math.min(this.size - 4, v));
+		const [px, py] = this.project(x, y);
 		return [clamp(px), clamp(py)];
 	}
 
@@ -69,10 +87,13 @@ export class Minimap {
 		trace: readonly number[],
 		colors: MinimapColors,
 		guide: readonly Point[] = [],
+		/** Frame the whole guide (the lesson) rather than only the leg being sailed. */
+		frameGuide = true,
 	): void {
 		const ctx = this.ctx;
 		const size = this.size;
 		if (!ctx || size === 0) return;
+		this.updateView(fitView(focusPoints(course, pose, nextMark, frameGuide ? guide : [])));
 		ctx.clearRect(0, 0, size, size);
 		ctx.fillStyle = colors.sea;
 		ctx.beginPath();
@@ -81,6 +102,31 @@ export class Minimap {
 		ctx.strokeStyle = colors.edge;
 		ctx.lineWidth = 1.5;
 		ctx.stroke();
+		// Legs and tracks that run off the map are cut at its edge.
+		ctx.save();
+		ctx.clip();
+
+		// Wind across the water: each arrow points the way the wind blows.
+		ctx.globalAlpha = 0.45;
+		ctx.strokeStyle = colors.wind;
+		ctx.lineWidth = 1.5;
+		ctx.lineCap = "round";
+		for (const fx of WIND_GRID) {
+			for (const fy of WIND_GRID) {
+				ctx.save();
+				ctx.translate(size * fx, size * fy);
+				ctx.rotate(wind + Math.PI);
+				ctx.beginPath();
+				ctx.moveTo(0, 6);
+				ctx.lineTo(0, -6);
+				ctx.moveTo(-3, -2.5);
+				ctx.lineTo(0, -6);
+				ctx.lineTo(3, -2.5);
+				ctx.stroke();
+				ctx.restore();
+			}
+		}
+		ctx.globalAlpha = 1;
 
 		// Course legs, or the lesson's intended path when there is one.
 		const path = guide.length >= 2 ? guide : [course.start, ...course.marks];
@@ -107,7 +153,7 @@ export class Minimap {
 
 		const last = course.marks.length - 1;
 		course.marks.forEach((mark, index) => {
-			const [x, y] = this.project(mark.x, mark.y);
+			const [x, y] = this.projectPinned(mark.x, mark.y);
 			ctx.fillStyle =
 				index < nextMark
 					? colors.done
@@ -128,8 +174,20 @@ export class Minimap {
 			}
 		});
 
+		ctx.restore();
+
+		// No-go zone: headings this close to the wind stall the boat.
+		const [bx, by] = this.projectPinned(pose.x, pose.y);
+		ctx.globalAlpha = 0.3;
+		ctx.fillStyle = colors.wind;
+		ctx.beginPath();
+		ctx.moveTo(bx, by);
+		ctx.arc(bx, by, NO_GO_RADIUS, wind - NO_GO_ANGLE - Math.PI / 2, wind + NO_GO_ANGLE - Math.PI / 2);
+		ctx.closePath();
+		ctx.fill();
+		ctx.globalAlpha = 1;
+
 		// Boat arrow.
-		const [bx, by] = this.project(pose.x, pose.y);
 		ctx.save();
 		ctx.translate(bx, by);
 		ctx.rotate(pose.heading);
@@ -139,25 +197,6 @@ export class Minimap {
 		ctx.lineTo(4.5, 5);
 		ctx.lineTo(0, 3);
 		ctx.lineTo(-4.5, 5);
-		ctx.closePath();
-		ctx.fill();
-		ctx.restore();
-
-		// Wind arrow in the corner: points the way the wind blows.
-		ctx.save();
-		ctx.translate(size - 15, 15);
-		ctx.rotate(wind + Math.PI);
-		ctx.strokeStyle = colors.wind;
-		ctx.fillStyle = colors.wind;
-		ctx.lineWidth = 2;
-		ctx.beginPath();
-		ctx.moveTo(0, 8);
-		ctx.lineTo(0, -5);
-		ctx.stroke();
-		ctx.beginPath();
-		ctx.moveTo(0, -9);
-		ctx.lineTo(4, -3);
-		ctx.lineTo(-4, -3);
 		ctx.closePath();
 		ctx.fill();
 		ctx.restore();

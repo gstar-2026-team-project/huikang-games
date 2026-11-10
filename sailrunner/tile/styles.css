@@ -219,6 +219,9 @@
 	display: grid;
 	place-items: center;
 }
+.icon-button[aria-pressed="true"][data-testid="path-toggle"] {
+	background: var(--primary);
+}
 
 .irons {
 	position: absolute;
@@ -406,17 +409,6 @@
 .secondary.small {
 	height: 32px;
 	padding: 0 10px;
-}
-
-.countdown {
-	position: absolute;
-	inset: 0;
-	display: grid;
-	place-items: center;
-	font-size: 88px;
-	font-weight: 900;
-	color: #fff;
-	text-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
 }
 
 .finish-banner {

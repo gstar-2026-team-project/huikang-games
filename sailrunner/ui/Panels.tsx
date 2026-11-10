@@ -68,14 +68,6 @@ export function ReadyPanel({
 	);
 }
 
-export function Countdown({ value }: { value: number }) {
-	return (
-		<div className="countdown" data-testid="countdown" aria-live="assertive">
-			{value > 0 ? value : "Go!"}
-		</div>
-	);
-}
-
 export interface FinishInfo {
 	timeMs: number;
 	newBest: boolean;
@@ -140,6 +132,11 @@ export function HelpSheet({ onClose }: { onClose(): void }) {
 					<li>
 						You can't sail within about 40° of the wind. To reach an upwind buoy, zig-zag (tack) across
 						the wind. The arrow by the speed gauge shows where the wind is blowing.
+					</li>
+					<li>Tap 🧭 to draw a suggested path through the buoys on the water and the map.</li>
+					<li>
+						The map follows the leg you are sailing. Its arrows show the wind, and the shaded wedge at
+						your boat is the no-go zone.
 					</li>
 					<li>The bar under your speed turns green on your fastest angles, often across the wind.</li>
 					<li>

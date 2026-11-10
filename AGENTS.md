@@ -5,6 +5,10 @@ top level, created with `poe-tiles tiles init <name>-<random suffix> --template 
 from this directory. Nothing is shared between games: each has its own
 dependencies, tests, and `.poe-tile.json`.
 
+For the full order of work (set up, change, test, play, ship to Joiner and
+GitHub Pages, pull from Joiner), read
+[`.claude/skills/game-dev-process/SKILL.md`](.claude/skills/game-dev-process/SKILL.md).
+
 ## Working on a game
 
 - Before working on a game, `cd` into its folder and read that folder's

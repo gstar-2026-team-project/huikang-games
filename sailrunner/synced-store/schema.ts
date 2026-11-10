@@ -33,7 +33,12 @@ const activeRunRow = z.object({
 });
 
 // Per-player presentation preferences; itemKey "prefs".
-const prefsRow = z.object({ muted: z.boolean(), tutorialDone: z.boolean().optional() });
+const prefsRow = z.object({
+	muted: z.boolean(),
+	tutorialDone: z.boolean().optional(),
+	// Whether the ideal path is drawn on the water and the map during a race.
+	showPath: z.boolean().optional(),
+});
 
 export const tileSchema = defineSchema({
 	schemaVersion: TILE_SCHEMA_VERSION,
@@ -87,6 +92,10 @@ export const tileSchema = defineSchema({
 		setMuted: {
 			description: "Mute or unmute sound for this player",
 			input: z.object({ muted: z.boolean() }),
+		},
+		setShowPath: {
+			description: "Show or hide the ideal path for this player",
+			input: z.object({ showPath: z.boolean() }),
 		},
 	},
 });

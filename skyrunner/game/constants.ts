@@ -4,7 +4,10 @@ export const DT = 1 / 60;
 export const MAX_FRAME_TIME = 0.1;
 
 export const START_TIME = 25;
-export const START_THROTTLE = 0.4;
+/** Every flight takes off with the throttle wide open. */
+export const START_THROTTLE = 1;
+/** Throttle the courses are laid out for; a flight starts at this speed and accelerates. */
+const CRUISE_THROTTLE = 0.4;
 /** Drag coefficient: speed settles where thrust equals DRAG * v². */
 export const DRAG = 0.0025;
 /** Level-flight speed with the throttle closed (below stall) and wide open, m/s. */
@@ -14,7 +17,7 @@ export const FULL_SPEED = 112;
 export function levelSpeed(throttle: number): number {
 	return Math.sqrt(IDLE_SPEED ** 2 + (FULL_SPEED ** 2 - IDLE_SPEED ** 2) * throttle);
 }
-export const CRUISE_SPEED = levelSpeed(START_THROTTLE); // ≈ 73 m/s, 263 km/h
+export const CRUISE_SPEED = levelSpeed(CRUISE_THROTTLE); // ≈ 73 m/s, 263 km/h
 export const MIN_SPEED = 18;
 export const MAX_SPEED = 135;
 /** Speed gates (m/s): blue rings must be passed below SLOW_GATE, purple ones above FAST_GATE. */
