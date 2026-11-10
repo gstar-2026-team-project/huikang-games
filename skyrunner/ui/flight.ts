@@ -176,7 +176,7 @@ export class FlightController {
 				}
 				this.refreshRival();
 				break;
-			case "miss": this.hud.toast(this.missionToast(e.index, false) ?? (e.why === "fast" ? "Too fast!" : e.why === "slow" ? "Too slow!" : "Missed")); haptics.impact("soft"); break;
+			case "miss": this.hud.toast(this.missionToast(e.index, false) ?? "Missed"); haptics.impact("soft"); break;
 			case "crash": haptics.notification("error"); this.finish("ground"); break;
 			case "timeout": haptics.notification("warning"); this.finish("time"); this.revealEndAfterBeat(); break;
 			case "complete": {

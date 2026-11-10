@@ -44,10 +44,6 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; co
 #alt.near b { color: var(--accent); }
 #alt.danger { box-shadow: inset 0 0 0 2px var(--danger); background: var(--danger); }
 #alt.danger b, #alt.danger small { color: #fff; }
-#spd.ok { box-shadow: inset 0 0 0 2px var(--good); }
-#spd.ok b { color: var(--good); }
-#spd.bad { box-shadow: inset 0 0 0 2px var(--danger); }
-#spd.bad b { color: var(--danger); }
 #map { position: absolute; top: calc(var(--sat) + 62px); right: calc(var(--sar) + 10px); width: 104px; height: 104px; border-radius: 50%; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
 #root:not([data-screen="play"]) #map { display: none; }
 #rival { position: absolute; top: calc(var(--sat) + 62px); left: calc(var(--sal) + 10px); display: flex; align-items: center; gap: 6px; min-height: 36px; padding: 3px 12px 3px 4px; border-radius: 18px; border: 0; background: var(--hud-bg); color: var(--hud-fg); font: 600 13px system-ui, sans-serif; white-space: nowrap; max-width: calc(100% - 140px - var(--sal) - var(--sar)); }

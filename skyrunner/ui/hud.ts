@@ -1,5 +1,5 @@
 import { STALL_SPEED } from "../game/constants";
-import { gateFault, groundBelow, type Sim } from "../game/flight";
+import { groundBelow, type Sim } from "../game/flight";
 import { initials, type Profile, type RivalView } from "./rivals";
 import type { ShellRefs } from "./shell";
 
@@ -71,14 +71,6 @@ export class Hud {
 			ui.altPill.classList.toggle("near", band === "low");
 		}
 		this.text("spd", ui.spdVal, String(Math.round(p.v * 3.6)));
-		// Next ring a speed gate? The speed readout goes green in range, red out of it.
-		const gate = flying ? sim.rings[sim.next]?.gate : undefined;
-		const gateState = gate ? (gateFault(gate, p.v) ? "bad" : "ok") : "";
-		if (this.last.get("gate") !== gateState) {
-			this.last.set("gate", gateState);
-			ui.spdPill.classList.toggle("ok", gateState === "ok");
-			ui.spdPill.classList.toggle("bad", gateState === "bad");
-		}
 		const low = sim.timeLeft < 5 ? "1" : "0";
 		if (this.last.get("low") !== low) {
 			this.last.set("low", low);

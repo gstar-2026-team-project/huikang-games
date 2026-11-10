@@ -3,9 +3,6 @@ import type { CanyonDims } from "./canyon";
 import { START_TIME } from "./constants";
 import type { Ring } from "./course";
 
-/** A ring that must be passed below (slow) or above (fast) a set speed. */
-export type Gate = "slow" | "fast";
-
 /** A hand-built course: fixed rings, mid-flight callouts, an opening tip, and how many misses still earn 2 stars. */
 export interface AuthoredCourse {
 	rings(): Ring[];
@@ -27,8 +24,6 @@ export interface CourseSpec {
 	canyon?: CanyonDims;
 	/** A hand-built course (with a target ring) instead of a generated one. */
 	authored?: AuthoredCourse;
-	/** Which rings are speed gates; undefined for plain rings. */
-	gate?(index: number): Gate | undefined;
 }
 
 /** Free flight and the daily challenge: endless, ramping to a floor. */
@@ -78,27 +73,11 @@ export function levelSpec(level: number): CourseSpec {
 		ringCount: 6 + n,
 		startTime: 20,
 		radius: (i) => Math.max(baseR - 4, baseR - i * 0.4),
-		// A slow gate costs time to brake into, so it pays it back.
-		bonus: (i) => AVG_RING_GAP / pace + 1 + (levelGate(n, i) === "slow" ? SLOW_GATE_TIME : 0),
-		gate: (i) => levelGate(n, i),
+		bonus: () => AVG_RING_GAP / pace + 1,
 		turn: (i) => Math.min(0.6, baseTurn + i * 0.01),
 		// Wide and shallow at level 1; narrow and deep by level 12.
 		canyon: { halfWidth: Math.max(120, 170 - n * 7), wallRun: 200 - n * 6, rim: 140 + n * 20 },
 	};
-}
-
-const SLOW_GATE_TIME = 4.5;
-
-/**
- * Speed gates by level (n is 0-based): none on levels 1–2, slow gates from
- * level 3, fast ones too from level 4, alternating and closer together later.
- */
-export function levelGate(n: number, i: number): Gate | undefined {
-	if (n < 2 || i < 2) return undefined;
-	const every = Math.max(2, 5 - Math.floor(n / 3));
-	if ((i - 2) % every !== 0) return undefined;
-	const g = (i - 2) / every;
-	return n === 2 || g % 2 === 0 ? "slow" : "fast";
 }
 
 export function levelSeed(level: number): number {

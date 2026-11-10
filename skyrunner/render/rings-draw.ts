@@ -116,31 +116,5 @@ export function drawIdealPath(ctx: CanvasRenderingContext2D, cam: Camera, sim: S
 
 export function ringColor(pal: Palette, ring: Ring, next: boolean): string {
 	if (ring.target) return next ? pal.ringTarget : pal.ringTargetDim;
-	if (ring.gate === "slow") return next ? pal.ringSlow : pal.ringSlowDim;
-	if (ring.gate === "fast") return next ? pal.ringFast : pal.ringFastDim;
 	return next ? pal.ring : pal.ringDim;
-}
-
-const GATE_LABEL = { slow: "SLOW · UNDER 200", fast: "FAST · OVER 330" } as const;
-
-/** Speed label floating above the next ring when it is a gate. */
-export function drawGateLabel(ctx: CanvasRenderingContext2D, cam: Camera, sim: Sim, pal: Palette): void {
-	const r = sim.rings[sim.next];
-	if (!r?.gate) return;
-	cam.point(r.x, r.y + r.r * 1.35, r.z, tmp);
-	const z = tmp[2] ?? 0;
-	if (z < NEAR) return;
-	const x = cam.sx(tmp), y = cam.sy(tmp);
-	if (x < -60 || x > cam.W + 60 || y < 70 || y > cam.H) return;
-	const text = GATE_LABEL[r.gate];
-	ctx.font = "800 13px system-ui, sans-serif";
-	ctx.textAlign = "center";
-	ctx.textBaseline = "middle";
-	const w = text.length * 8 + 16; // fixed-width estimate: no per-frame measureText
-	ctx.fillStyle = r.gate === "slow" ? pal.ringSlow : pal.ringFast;
-	ctx.beginPath();
-	ctx.roundRect(x - w / 2, y - 12, w, 24, 12);
-	ctx.fill();
-	ctx.fillStyle = "#fff";
-	ctx.fillText(text, x, y + 0.5);
 }

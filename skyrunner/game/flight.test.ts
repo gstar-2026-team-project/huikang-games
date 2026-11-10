@@ -1,9 +1,7 @@
 import { expect, test } from "bun:test";
 import { CRUISE_SPEED, DT, START_TIME } from "./constants";
 import { maxClimbFor, maxTurnFor, nextRing, type Ring, ringBonus, ringRadius } from "./course";
-import { createSim, gateFault, groundBelow, NO_CONTROLS, type SimEvent, stepSim } from "./flight";
-import { FAST_GATE, FULL_SPEED, SLOW_GATE } from "./constants";
-import { maxTurnAt, yawRateAt } from "./course";
+import { createSim, groundBelow, NO_CONTROLS, type SimEvent, stepSim } from "./flight";
 import { DAILY, DAILY_SECONDS, dailyScore, dayKey, daySeed, decodeDailyScore, LEVEL_COUNT, levelSeed, levelSpec, starsFor } from "./modes";
 import { FINALE_LEVEL, levelCourse, levelStars } from "./levels";
 import { surfaceHeight, terrainHeight } from "./terrain";
@@ -126,7 +124,7 @@ test("a level is a fixed, finite course that completes after its last ring", () 
 	// Steer straight through each ring by placing the plane just before it.
 	for (let i = 0; i < 200 && a.phase === "flying"; i++) {
 		const r = a.rings[a.next];
-		if (r) a.plane = { ...a.plane, x: r.x - Math.sin(r.yaw) * 0.5, y: r.y, z: r.z - Math.cos(r.yaw) * 0.5, yaw: r.yaw, pitch: 0, v: r.gate === "slow" ? 45 : r.gate === "fast" ? 100 : 73 };
+		if (r) a.plane = { ...a.plane, x: r.x - Math.sin(r.yaw) * 0.5, y: r.y, z: r.z - Math.cos(r.yaw) * 0.5, yaw: r.yaw, pitch: 0, v: 73 };
 		stepSim(a, NO_CONTROLS, DT, events);
 	}
 	expect(a.rings).toHaveLength(spec.ringCount ?? 0);
@@ -171,46 +169,17 @@ test("level rings sit low in a canyon: water under every ring, rock walls to eit
 	}
 });
 
-test("speed gates: blue rings need under 200 km/h, purple ones over 330, and they arrive from level 3", () => {
-	expect(gateFault("slow", SLOW_GATE - 1)).toBeUndefined();
-	expect(gateFault("slow", SLOW_GATE + 1)).toBe("fast");
-	expect(gateFault("fast", FAST_GATE + 1)).toBeUndefined();
-	expect(gateFault("fast", FAST_GATE - 1)).toBe("slow");
-	expect(gateFault(undefined, 200)).toBeUndefined();
-	const gatesOf = (n: number) => createSim(levelSeed(n), levelSpec(n)).rings.map((r) => r.gate);
-	expect(gatesOf(1).filter(Boolean)).toEqual([]);
-	expect(gatesOf(2).filter(Boolean)).toEqual([]);
-	expect(gatesOf(3)).toContain("slow");
-	expect(gatesOf(3)).not.toContain("fast");
-	expect(gatesOf(4)).toContain("fast");
-	expect(gatesOf(12).filter(Boolean).length).toBeGreaterThan(gatesOf(5).filter(Boolean).length);
-});
-
-test("a slow gate's hairpin is one a slow plane can make and a full-throttle plane cannot", () => {
-	for (let n = 3; n <= LEVEL_COUNT; n++) {
-		const rings = createSim(levelSeed(n), levelSpec(n)).rings;
-		rings.forEach((r, i) => {
-			if (r.gate !== "slow") return;
-			const p = rings[i - 1]!;
-			const dist = Math.hypot(r.x - p.x, r.z - p.z);
-			const turn = Math.abs(r.yaw - p.yaw);
-			expect(turn).toBeLessThanOrEqual(maxTurnAt(dist, SLOW_GATE) + 1e-9);
-			// Full bank at full speed for the whole leg still falls short of 1.6× the turn asked.
-			expect(yawRateAt(FULL_SPEED) * (dist / FULL_SPEED)).toBeLessThan(turn * 1.6);
-		});
+test("a ring counts at any speed", () => {
+	for (const v of [40, 73, 110]) {
+		const sim = createSim(levelSeed(4), levelSpec(4));
+		const events: SimEvent[] = [];
+		sim.next = 3;
+		const r = sim.rings[3]!;
+		sim.plane = { ...sim.plane, x: r.x - Math.sin(r.yaw) * 0.5, y: r.y, z: r.z - Math.cos(r.yaw) * 0.5, yaw: r.yaw, pitch: 0, v };
+		stepSim(sim, NO_CONTROLS, DT, events);
+		expect(events.find((e) => e.kind === "ring")).toMatchObject({ kind: "ring", index: 3 });
+		expect(sim.score).toBe(1);
 	}
-});
-
-test("passing a gate at the wrong speed is a miss with a reason", () => {
-	const sim = createSim(levelSeed(4), levelSpec(4));
-	const events: SimEvent[] = [];
-	const gi = sim.rings.findIndex((r) => r.gate === "slow");
-	sim.next = gi;
-	const r = sim.rings[gi]!;
-	sim.plane = { ...sim.plane, x: r.x - Math.sin(r.yaw) * 0.5, y: r.y, z: r.z - Math.cos(r.yaw) * 0.5, yaw: r.yaw, pitch: 0, v: 100 };
-	stepSim(sim, NO_CONTROLS, DT, events);
-	expect(events.find((e) => e.kind === "miss")).toMatchObject({ kind: "miss", why: "fast" });
-	expect(sim.score).toBe(0);
 });
 
 test("the last level flies the mission course, and the others are generated canyons", () => {

@@ -2,7 +2,7 @@ import type { Sim } from "../game/flight";
 import { Camera } from "./camera";
 import type { Palette } from "./palette";
 import { drawPlane } from "./plane-draw";
-import { drawGateLabel, drawIdealPath, drawRing, drawRingArrow, queueRings, type RingItem } from "./rings-draw";
+import { drawIdealPath, drawRing, drawRingArrow, queueRings, type RingItem } from "./rings-draw";
 import { type CloudItem, drawCloud, drawSky, queueClouds } from "./sky";
 import { drawQuad, type QuadItem, queueTerrain } from "./terrain-draw";
 
@@ -45,9 +45,6 @@ export class Scene {
 		}
 		if (showPath && sim.phase === "flying") drawIdealPath(ctx, cam, sim, pal);
 		drawPlane(ctx, cam, sim, pal, restT);
-		if (sim.phase === "flying") {
-			drawGateLabel(ctx, cam, sim, pal);
-			drawRingArrow(ctx, cam, sim, pal);
-		}
+		if (sim.phase === "flying") drawRingArrow(ctx, cam, sim, pal);
 	}
 }

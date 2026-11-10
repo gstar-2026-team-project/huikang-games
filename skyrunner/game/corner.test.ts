@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { DT, FULL_SPEED, SLOW_GATE } from "./constants";
+import { DT, FULL_SPEED, TIGHT_TURN_SPEED } from "./constants";
 import { CORNER, CORNER_RADIUS, CORNER_RINGS } from "./corner";
 import { maxClimbFor, yawRateAt } from "./course";
 import { createSim, groundBelow, NO_CONTROLS, type SimEvent, stepSim } from "./flight";
@@ -29,7 +29,7 @@ test("level 6 is the hand-built corner run: one 90° turn, a climb, a dive, and 
 
 test("the corner fits a cruising plane but not a flat-out one", () => {
 	const radius = (v: number) => v / yawRateAt(v);
-	expect(radius(SLOW_GATE)).toBeLessThan(CORNER_RADIUS);
+	expect(radius(TIGHT_TURN_SPEED)).toBeLessThan(CORNER_RADIUS);
 	expect(radius(73)).toBeLessThan(CORNER_RADIUS);
 	expect(radius(FULL_SPEED)).toBeGreaterThan(CORNER_RADIUS);
 });

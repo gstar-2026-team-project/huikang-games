@@ -4,8 +4,6 @@ import {
 	CRASH_CLEARANCE,
 	CRASH_DURATION,
 	CRUISE_SPEED,
-	FAST_GATE,
-	SLOW_GATE,
 	DRAG,
 	levelSpeed,
 	MAX_PITCH,
@@ -78,7 +76,7 @@ export interface Sim {
 
 export type SimEvent =
 	| { kind: "ring"; index: number; bonus: number }
-	| { kind: "miss"; index: number; why?: "slow" | "fast" }
+	| { kind: "miss"; index: number }
 	| { kind: "crash" }
 	| { kind: "timeout" }
 	| { kind: "complete" }
@@ -149,14 +147,7 @@ function canyonPath(rings: readonly Ring[]): PathPoint[] {
 
 const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
 
-/** Gate check: "fast" means the plane was too fast for a slow gate, and vice versa. */
-export function gateFault(gate: Ring["gate"], v: number): "slow" | "fast" | undefined {
-	if (gate === "slow" && v >= SLOW_GATE) return "fast";
-	if (gate === "fast" && v <= FAST_GATE) return "slow";
-	return undefined;
-}
-
-function advanceRing(sim: Sim, hit: boolean, events: SimEvent[], why?: "slow" | "fast"): void {
+function advanceRing(sim: Sim, hit: boolean, events: SimEvent[]): void {
 	const ring = sim.rings[sim.next];
 	if (!ring) return;
 	ring.hit = hit;
@@ -167,7 +158,7 @@ function advanceRing(sim: Sim, hit: boolean, events: SimEvent[], why?: "slow" | 
 		const bonus = sim.spec.bonus(sim.next);
 		sim.timeLeft += bonus;
 		events.push({ kind: "ring", index: sim.next, bonus });
-	} else events.push({ kind: "miss", index: sim.next, ...(why ? { why } : {}) });
+	} else events.push({ kind: "miss", index: sim.next });
 	sim.next++;
 	const count = sim.spec.ringCount;
 	if (count !== null && sim.rings.length >= count) return;
@@ -239,9 +230,7 @@ export function stepSim(sim: Sim, ctl: Controls, dt: number, events: SimEvent[])
 		if (d0 < 0 && d1 >= 0) {
 			const lx = p.x - ring.x - nx * d1;
 			const lz = p.z - ring.z - nz * d1;
-			const inside = Math.hypot(lx, p.y - ring.y, lz) < ring.r;
-			const fault = inside ? gateFault(ring.gate, p.v) : undefined;
-			advanceRing(sim, inside && !fault, events, fault);
+			advanceRing(sim, Math.hypot(lx, p.y - ring.y, lz) < ring.r, events);
 		} else if (d1 > MISS_PAST_DISTANCE) advanceRing(sim, false, events);
 	}
 

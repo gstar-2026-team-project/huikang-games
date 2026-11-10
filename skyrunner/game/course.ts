@@ -1,6 +1,5 @@
 import {
 	CRUISE_SPEED,
-	SLOW_GATE,
 	FIRST_RING_DISTANCE,
 	MAX_PITCH,
 	MAX_YAW_RATE,
@@ -10,7 +9,7 @@ import {
 	RING_MAX_ALTITUDE,
 	START_CLEARANCE,
 } from "./constants";
-import { type CourseSpec, ENDLESS, type Gate } from "./modes";
+import { type CourseSpec, ENDLESS } from "./modes";
 import type { Rand } from "./rng";
 import { highestGround, type TerrainPhases, terrainHeight } from "./terrain";
 
@@ -24,8 +23,6 @@ export interface Ring {
 	hit: boolean | null;
 	/** The strike mission's target ring. */
 	target?: boolean;
-	/** Speed gate: pass below SLOW_GATE or above FAST_GATE. */
-	gate?: Gate;
 }
 
 /** Endless-course ring size: starts wide and shrinks to a floor. */
@@ -87,32 +84,13 @@ function canyonRing(prev: Ring | null, index: number, rand: Rand, spec: CourseSp
 	const span = Math.min(70, (spec.canyon?.rim ?? 140) * 0.35);
 	if (!prev) return { x: 0, y: floor + span * 0.4, z: FIRST_RING_DISTANCE, yaw: 0, r, hit: null };
 	const dist = RING_DISTANCE_MIN + rand() * RING_DISTANCE_SPREAD;
-	const gate = spec.gate?.(index);
-	const side = rand() * 2 - 1;
-	// Slow gates end a hairpin only a slow plane can make; fast gates sit on straights.
-	const yaw =
-		gate === "slow"
-			? prev.yaw + Math.sign(side || 1) * Math.min(HAIRPIN, maxTurnAt(dist, SLOW_GATE))
-			: gate === "fast"
-				? prev.yaw + side * 0.08
-				: prev.yaw + side * Math.min(spec.turn(index), maxTurnFor(dist));
+	const yaw = prev.yaw + (rand() * 2 - 1) * Math.min(spec.turn(index), maxTurnFor(dist));
 	const climb = maxClimbFor(dist);
-	let y = floor + rand() * span;
-	if (gate) y = Math.min(y, prev.y + climb * 0.3); // no big climb into a gate: speed is the test
-	y = Math.max(prev.y - climb, Math.min(prev.y + climb, y));
-	return {
-		x: prev.x + Math.sin(yaw) * dist, y: Math.max(floor, y), z: prev.z + Math.cos(yaw) * dist, yaw, r, hit: null,
-		...(gate ? { gate } : {}),
-	};
+	const y = Math.max(prev.y - climb, Math.min(prev.y + climb, floor + rand() * span));
+	return { x: prev.x + Math.sin(yaw) * dist, y: Math.max(floor, y), z: prev.z + Math.cos(yaw) * dist, yaw, r, hit: null };
 }
 
-/** Heading change of a slow-gate hairpin (rad). */
-const HAIRPIN = 0.9;
 /** Turn rate at full bank for a given speed (rad/s), from the coordinated-turn model. */
 export function yawRateAt(v: number): number {
 	return Math.min(MAX_YAW_RATE, (9.81 * Math.tan(1.1)) / Math.max(v, 25));
-}
-/** Largest turn asked over `dist` at speed `v`: under half of what full bank could do. */
-export function maxTurnAt(dist: number, v: number): number {
-	return yawRateAt(v) * (dist / v) * 0.45;
 }

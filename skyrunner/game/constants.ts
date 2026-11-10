@@ -20,9 +20,8 @@ export function levelSpeed(throttle: number): number {
 export const CRUISE_SPEED = levelSpeed(CRUISE_THROTTLE); // ≈ 73 m/s, 263 km/h
 export const MIN_SPEED = 18;
 export const MAX_SPEED = 135;
-/** Speed gates (m/s): blue rings must be passed below SLOW_GATE, purple ones above FAST_GATE. */
-export const SLOW_GATE = 55.6; // 200 km/h
-export const FAST_GATE = 91.7; // 330 km/h
+/** A speed slow enough to make the tightest corners (m/s, 200 km/h). */
+export const TIGHT_TURN_SPEED = 55.6;
 export const STALL_SPEED = 34;
 export const MAX_YAW_RATE = 0.7; // rad/s
 export const MAX_PITCH = 0.95; // rad

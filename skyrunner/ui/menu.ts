@@ -56,7 +56,7 @@ export function levelsPanel(stars: readonly number[]): PanelModel {
 		buttons.push({ action: "level", level: n, testid: `level-${n}`, label: String(n), sub: starRow(stars[n - 1] ?? 0) });
 	}
 	buttons.push({ action: "back", testid: "back", label: "Back" });
-	return { title: "Levels", text: "Hit every ring for three stars. Blue rings: slow down. Purple: full throttle.", layout: "grid", buttons };
+	return { title: "Levels", text: "Hit every ring for three stars. Slow down to make the tight turns.", layout: "grid", buttons };
 }
 
 export function pausedPanel(): PanelModel {
