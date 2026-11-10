@@ -1,4 +1,4 @@
-import { heightToGlide, type Plan } from "./autopilot";
+import { CRUISE_SPEED, heightToGlide, type Plan } from "./autopilot";
 import { glideRatio, type Sim } from "./flight";
 import { terrainHeight } from "./terrain";
 import { CLOUD_BASE } from "./thermals";
@@ -9,8 +9,8 @@ export const PATH_SAMPLES_PER_LEG = 10;
 export const PATH_BUFFER_LENGTH = (2 * PATH_SAMPLES_PER_LEG + 2) * 3;
 /** The line stays at least this far above the ground (m), so it never dives into a hill. */
 const PATH_FLOOR = 25;
-/** Speed whose glide slope the line is drawn at (m/s). */
-const PATH_SPEED = 48;
+/** Speed whose glide slope the line is drawn at (m/s): the autopilot's cruise. */
+const PATH_SPEED = CRUISE_SPEED;
 
 /**
  * The autopilot's plan as a line to fly: from the glider down the glide slope

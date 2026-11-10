@@ -15,6 +15,9 @@ import {
 	THERMAL_STRENGTH_MIN,
 	THERMAL_STRENGTH_SPREAD,
 	type Thermal,
+	THERMAL_INFLOW,
+	type ThermalAir,
+	thermalAirAt,
 	thermalsNear,
 	WIND_MIN,
 	WIND_SPREAD,
@@ -106,13 +109,20 @@ test("the air changes during a flight: thermals alive at the start are gone a pe
 	expect(liftAt(SEED, th.x + wind.x * (later - 10), 500, th.z + wind.z * (later - 10), later)).toBeLessThan(th.strength);
 });
 
-test("lift is full in the core, falls to zero at the edge, and fades out under the cloud base", () => {
-	expect(liftProfile(0, 150)).toBe(1);
-	expect(liftProfile(150 * THERMAL_CORE, 150)).toBe(1);
-	expect(liftProfile(100, 150)).toBeGreaterThan(liftProfile(130, 150));
-	expect(liftProfile(149.9, 150)).toBeLessThan(0.001);
-	expect(liftProfile(150, 150)).toBe(0);
-	expect(liftProfile(400, 150)).toBe(0);
+test("lift is a smooth bell: strongest in the core, easing to zero at the edge, and fading out under the cloud base", () => {
+	expect(liftProfile(0, 300)).toBe(1);
+	// Strictly falling outward, with no step anywhere: the variometer moves continuously.
+	let prev = 1;
+	for (let d = 5; d <= 300; d += 5) {
+		const k = liftProfile(d, 300);
+		expect(k).toBeLessThan(prev);
+		expect(prev - k).toBeLessThan(0.06);
+		prev = k;
+	}
+	expect(liftProfile(300 * THERMAL_CORE, 300)).toBeGreaterThan(0.4);
+	expect(liftProfile(300 * 0.7, 300)).toBeLessThan(0.15);
+	expect(liftProfile(300, 300)).toBe(0);
+	expect(liftProfile(400, 300)).toBe(0);
 	expect(cloudFade(300)).toBe(1);
 	expect(cloudFade(CLOUD_BASE - 30)).toBeGreaterThan(0);
 	expect(cloudFade(CLOUD_BASE - 30)).toBeLessThan(0.5);
@@ -123,8 +133,24 @@ test("lift is full in the core, falls to zero at the edge, and fades out under t
 	expect(liftAt(SEED, th.x, 400, th.z, 60)).toBeCloseTo(th.peak, 5);
 	expect(liftAt(SEED, th.x + th.radius * 0.8, 400, th.z, 60)).toBeLessThan(th.peak * 0.5);
 	expect(liftAt(SEED, th.x, CLOUD_BASE + 1, th.z, 60)).toBe(0);
-	// Never negative, anywhere.
+	// Never negative, anywhere: the sink between thermals is the air field's job.
 	for (let i = 0; i < 200; i++) expect(liftAt(SEED, FAR + i * 37, 300 + i * 4, FAR - i * 53, i * 1.7)).toBeGreaterThanOrEqual(0);
+});
+
+test("air flows in toward a thermal's core, so a glider circling in it is drawn to the centre", () => {
+	const th = thermalsNear(SEED, FAR, FAR, 60, 1).filter((c) => c.life === 1)[0]!;
+	const out: ThermalAir = { lift: 0, vx: 0, vz: 0 };
+	for (const a of [0, 1.3, 2.9, 4.4]) {
+		const x = th.x + Math.cos(a) * th.radius * 0.5, z = th.z + Math.sin(a) * th.radius * 0.5;
+		thermalAirAt(SEED, x, 400, z, 60, out);
+		// Pointing at the centre, and no faster than the inflow.
+		expect(out.vx * (th.x - x) + out.vz * (th.z - z)).toBeGreaterThan(0);
+		expect(Math.hypot(out.vx, out.vz)).toBeLessThanOrEqual(THERMAL_INFLOW + 1e-9);
+		expect(Math.hypot(out.vx, out.vz)).toBeGreaterThan(THERMAL_INFLOW * 0.5);
+	}
+	// Still air far from any thermal, and above the cloud base.
+	thermalAirAt(SEED, th.x, CLOUD_BASE + 50, th.z, 60, out);
+	expect([out.lift, out.vx, out.vz]).toEqual([0, 0, 0]);
 });
 
 test("every seed opens with one healthy thermal just ahead of the launch point", () => {

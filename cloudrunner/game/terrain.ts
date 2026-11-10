@@ -33,7 +33,7 @@ export interface Terrain {
 	snowLine: number;
 }
 
-export const VALLEY_SNOW_LINE = 230;
+export const VALLEY_SNOW_LINE = 300;
 
 /** Lattice spacing of the drawn terrain mesh, in metres. */
 export const TERRAIN_CELL = 80;

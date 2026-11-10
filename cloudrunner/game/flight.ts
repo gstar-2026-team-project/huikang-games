@@ -15,6 +15,9 @@ import {
 	PITCH_RATE,
 	STALL_SPEED,
 	TRIM_RATE,
+	TURN_REF_SPEED,
+	TURN_SINK,
+	VARIO_LAG,
 	TURNPOINT_FX_DURATION,
 	TURNPOINTS_AHEAD,
 } from "./constants";
@@ -22,7 +25,8 @@ import { FREE, type TaskSpec } from "./modes";
 import { mulberry32, type Rand } from "./rng";
 import { nextTurnpoint, startAltitude, type Turnpoint } from "./task";
 import { surfaceHeight, type Terrain, type TerrainPhases, valleyTerrain } from "./terrain";
-import { liftAt } from "./thermals";
+import { type Air, airAt } from "./air";
+import { windOf } from "./thermals";
 
 export interface Plane {
 	x: number;
@@ -64,6 +68,8 @@ export interface Sim {
 	/** Vertical speed of the glider (m/s, up) and of the air around it, from the last step. */
 	climb: number;
 	lift: number;
+	/** The variometer: the climb rate as the instrument shows it, smoothed over about VARIO_LAG seconds. */
+	vario: number;
 	phase: Phase;
 	endReason: EndReason | null;
 	crashT: number;
@@ -111,7 +117,7 @@ export function createSim(seed: number, spec: TaskSpec = FREE): Sim {
 		terr,
 		terrain: valleyTerrain(terr),
 		rand,
-		plane: { x: 0, y: startAltitude(terr), z: 0, yaw: 0, pitch: trimPitch(BEST_GLIDE_SPEED), roll: 0, v: BEST_GLIDE_SPEED },
+		plane: { x: 0, y: startAltitude(terr), z: 0, yaw: crabYaw(seed, 0, BEST_GLIDE_SPEED), pitch: trimPitch(BEST_GLIDE_SPEED), roll: 0, v: BEST_GLIDE_SPEED },
 		camRoll: 0,
 		turnpoints,
 		next: 0,
@@ -119,6 +125,7 @@ export function createSim(seed: number, spec: TaskSpec = FREE): Sim {
 		lastTurnpointAt: 0,
 		climb: 0,
 		lift: 0,
+		vario: -sinkRate(BEST_GLIDE_SPEED),
 		phase: "flying",
 		endReason: null,
 		crashT: 0,
@@ -137,8 +144,15 @@ export function groundBelow(sim: Sim): number {
 	return surfaceHeight(sim.terrain, sim.plane.x, sim.plane.z);
 }
 
-/** Share of the glider's bank the chase camera leans with: low, so the world stays readable through a long circle. */
-const CAMERA_BANK = 0.45;
+/** Share of the glider's bank the chase camera leans with: low, so the horizon stays nearly level through a long circle. */
+export const CAMERA_BANK = 0.16;
+
+/** Heading (rad) whose ground track runs along `track` once the wind's drift is added, at airspeed v. */
+export function crabYaw(seed: number, track: number, v: number): number {
+	const w = windOf(seed);
+	const cross = w.x * Math.cos(track) - w.z * Math.sin(track);
+	return track - Math.asin(Math.max(-0.9, Math.min(0.9, cross / v)));
+}
 
 const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -156,6 +170,8 @@ function crash(sim: Sim, events: SimEvent[]): void {
 	for (let i = 0; i < BURST_PARTICLES; i++) sim.burst.push({ a: r() * 6.28, s: 0.4 + r(), c: i % 3 });
 	events.push({ kind: "crash" });
 }
+
+const airScratch: Air = { up: 0, vx: 0, vz: 0 };
 
 /** One fixed step of flight. Pushes what happened into `events`. */
 export function stepSim(sim: Sim, ctl: Controls, dt: number, events: SimEvent[]): void {
@@ -180,20 +196,22 @@ export function stepSim(sim: Sim, ctl: Controls, dt: number, events: SimEvent[])
 	if (Math.abs(ctl.pitch) < 0.05) p.pitch += (trimPitch(p.v) - p.pitch) * Math.min(1, TRIM_RATE * dt);
 	if (p.v < STALL_SPEED) p.pitch -= (STALL_SPEED - p.v) * 0.04 * dt;
 	p.pitch = clamp(p.pitch, -MAX_PITCH, MAX_PITCH);
-	// Coordinated turn from bank angle.
-	const yawRate = (GRAVITY * Math.tan(p.roll)) / Math.max(p.v, 25);
-	p.yaw += clamp(yawRate, -MAX_YAW_RATE, MAX_YAW_RATE) * dt;
+	// Bank turns the glider: a little quicker when slow, a little slower when fast.
+	const bank = p.roll / MAX_BANK;
+	p.yaw += bank * MAX_YAW_RATE * clamp(TURN_REF_SPEED / p.v, 0.6, 1.25) * dt;
 	// No engine: speed changes only from drag and from gravity along the flight path.
 	const acc = -dragAt(p.v) - GRAVITY * Math.sin(p.pitch);
 	p.v = clamp(p.v + acc * dt, MIN_SPEED, MAX_SPEED);
 
-	// Move through the air, and let the air carry the glider up.
+	// Move through the air, drift with the wind, and let the air carry the glider up or down.
 	const f = forward(p);
-	sim.lift = liftAt(sim.seed, p.x, p.y, p.z, sim.elapsed);
-	sim.climb = f[1] * p.v + sim.lift;
-	p.x += f[0] * p.v * dt;
+	const air = airAt(sim.seed, sim.terr, p.x, p.y, p.z, sim.elapsed, airScratch);
+	sim.lift = air.up;
+	sim.climb = f[1] * p.v + sim.lift - TURN_SINK * bank * bank;
+	p.x += (f[0] * p.v + air.vx) * dt;
 	p.y += sim.climb * dt;
-	p.z += f[2] * p.v * dt;
+	p.z += (f[2] * p.v + air.vz) * dt;
+	sim.vario += (sim.climb - sim.vario) * Math.min(1, dt / VARIO_LAG);
 	if (p.y > CEILING) {
 		p.y = CEILING;
 		p.pitch = Math.min(p.pitch, 0);

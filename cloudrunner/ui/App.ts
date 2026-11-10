@@ -12,6 +12,7 @@ import { PALETTES } from "../render/palette";
 import { Minimap } from "../render/minimap";
 import { Scene } from "../render/scene";
 import { mountShell } from "./shell";
+import { VarioAudio } from "./vario-audio";
 
 /** Mount Cloudrunner into `root`. Returns an unmount function. */
 export function mountApp(root: HTMLElement, props: AppProps): () => void {
@@ -41,6 +42,28 @@ export function mountApp(root: HTMLElement, props: AppProps): () => void {
 	const minimap = new Minimap(ui.map);
 	const darkQ = window.matchMedia?.("(prefers-color-scheme: dark)");
 	const palette = () => (darkQ?.matches ? PALETTES.dark : PALETTES.light);
+
+	// The audible variometer: started by the first gesture, as autoplay rules require.
+	const audio = new VarioAudio(props.resumeAudioContext);
+	cleanups.push(() => audio.dispose());
+	const showMute = () => {
+		ui.mute.textContent = audio.muted ? "Sound off" : "Sound on";
+		ui.mute.setAttribute("aria-pressed", String(audio.muted));
+	};
+	showMute();
+	const onMute = () => {
+		audio.setMuted(!audio.muted);
+		showMute();
+	};
+	ui.mute.addEventListener("click", onMute);
+	cleanups.push(() => ui.mute.removeEventListener("click", onMute));
+	const unlock = () => audio.unlock();
+	window.addEventListener("pointerdown", unlock, true);
+	window.addEventListener("keydown", unlock, true);
+	cleanups.push(() => {
+		window.removeEventListener("pointerdown", unlock, true);
+		window.removeEventListener("keydown", unlock, true);
+	});
 
 	// The ideal path is a view option, off until asked for: the autopilot's plan,
 	// drawn to the thermal it would use and on to the next beacon.
@@ -74,9 +97,11 @@ export function mountApp(root: HTMLElement, props: AppProps): () => void {
 			render: (dt, nowMs) => {
 				const playing = flight.screen === "play";
 				const route = showPath && playing && flight.sim.phase === "flying" ? currentPlan(flight.sim) : null;
-				scene?.draw(flight.sim, palette(), playing ? null : nowMs / 1000, route);
+				scene?.draw(flight.sim, palette(), playing ? null : nowMs / 1000, route, dt);
 				if (playing) minimap.draw(flight.sim, palette(), darkQ?.matches ? "dark" : "light", route);
-				hud.update(flight.sim, playing && flight.sim.phase === "flying", input.knob, dt);
+				const flying = playing && flight.sim.phase === "flying";
+				hud.update(flight.sim, flying, input.knob, dt);
+				audio.update(flight.sim.vario, flying);
 			},
 			isIdle: () => flight.screen !== "play" && !hud.busy,
 		},

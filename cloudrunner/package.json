@@ -8,7 +8,7 @@
 		"build": "bun scripts/check-bun.ts && vite build",
 		"build:web": "bun scripts/check-bun.ts && vite build --config vite.web.config.ts",
 		"type-check": "tsc --noEmit",
-		"test": "bun test --conditions browser ./synced-store ./game ./render ./web ./ui",
+		"test": "bun test --conditions browser ./synced-store ./game ./render ./web ./ui ./ui/App.test.happydom.tsx",
 		"test:playwright": "bun run build && bunx playwright install chromium && bunx playwright test --update-snapshots",
 		"test:all": "bun run type-check && bun run test",
 		"verify": "bun run type-check && bun run test && bun run build && bun run build:web && bunx playwright install chromium && bunx playwright test && bun run doctor",

@@ -5,32 +5,34 @@
  */
 
 /** Grid spacing (m): each cell grows at most one thermal at a time. */
-export const THERMAL_CELL = 700;
+export const THERMAL_CELL = 1300;
 /** Each cell starts a new thermal this often (s), at its own phase. */
-export const THERMAL_PERIOD = 75;
-export const THERMAL_LIFE_MIN = 45;
-export const THERMAL_LIFE_SPREAD = 20;
-export const THERMAL_RADIUS_MIN = 140;
-export const THERMAL_RADIUS_SPREAD = 70;
+export const THERMAL_PERIOD = 130;
+export const THERMAL_LIFE_MIN = 80;
+export const THERMAL_LIFE_SPREAD = 40;
+export const THERMAL_RADIUS_MIN = 300;
+export const THERMAL_RADIUS_SPREAD = 100;
 /** Lift at the core (m/s). */
-export const THERMAL_STRENGTH_MIN = 11;
-export const THERMAL_STRENGTH_SPREAD = 5;
+export const THERMAL_STRENGTH_MIN = 14;
+export const THERMAL_STRENGTH_SPREAD = 4;
 /** A thermal builds over RAMP seconds and collapses over the last FADE seconds. */
-export const THERMAL_RAMP = 6;
-export const THERMAL_FADE = 9;
-/** The inner part of the column lifts at full strength; outside it the lift falls to zero at the edge. */
-export const THERMAL_CORE = 0.35;
+export const THERMAL_RAMP = 8;
+export const THERMAL_FADE = 12;
+/** Share of the radius that counts as the core: where the lift is still most of its peak (drawn densest). */
+export const THERMAL_CORE = 0.4;
+/** How sharply the lift peaks at the centre: the bell is (1 - u²)^LIFT_SHAPE. */
+export const LIFT_SHAPE = 4;
 /** Lift dies away over the last CLOUD_FADE metres below the cloud base. */
-export const CLOUD_BASE = 1100;
+export const CLOUD_BASE = 850;
 export const CLOUD_FADE = 120;
 /** Thermals drift downwind at this speed (m/s), in a direction fixed per seed. */
 export const WIND_MIN = 1.5;
 export const WIND_SPREAD = 2;
 
 /** The opening thermal every flight gets, just ahead of the launch point. */
-export const START_THERMAL = { x: 30, z: 470, radius: 190, strength: 13, life: 40 } as const;
+export const START_THERMAL = { x: 30, z: 470, radius: 330, strength: 14, life: 90 } as const;
 /** No ordinary thermal is born this close to the opening one while it lives. */
-const START_KEEP_OUT = 420;
+const START_KEEP_OUT = 560;
 
 export interface Thermal {
 	/** Stable for the thermal's whole life. */
@@ -146,12 +148,16 @@ export function thermalsNear(seed: number, x: number, z: number, t: number, reac
 	return out;
 }
 
-/** Share of a thermal's core lift at `dist` metres from its centre: 1 in the core, 0 at the edge. */
+/**
+ * Share of a thermal's peak lift at `dist` metres from its centre: a smooth
+ * bell, 1 at the centre and easing to 0 at the edge with no steps, so the
+ * variometer rises steadily as the glider closes on the core.
+ */
 export function liftProfile(dist: number, radius: number): number {
 	const u = dist / radius;
 	if (u >= 1) return 0;
-	if (u <= THERMAL_CORE) return 1;
-	return 0.5 * (1 + Math.cos((Math.PI * (u - THERMAL_CORE)) / (1 - THERMAL_CORE)));
+	const k = 1 - u * u;
+	return k ** LIFT_SHAPE;
 }
 
 /** How much of the lift is left at height y: all of it low down, none at the cloud base. */
@@ -161,21 +167,65 @@ export function cloudFade(y: number): number {
 
 const scratch = blank();
 
-/** Vertical speed of the air (m/s, up) at a point and time. Allocation-free: the sim calls it every step. */
-export function liftAt(seed: number, x: number, y: number, z: number, t: number): number {
+/**
+ * Air converges into the foot of every thermal: a gentle horizontal inflow
+ * toward its centre (m/s at its strongest, about halfway out). A glider that
+ * keeps circling in the lift is drawn slowly toward the core, so holding a
+ * turn is enough to stay in a thermal and centre it.
+ */
+export const THERMAL_INFLOW = 7;
+/** The inflow reaches this share of the radius beyond the edge. */
+const INFLOW_REACH = 1.4;
+/** Within this distance of the centre (m) the inflow eases off, so it settles rather than overshoots. */
+const INFLOW_CORE = 30;
+
+/** What the thermals do to the air at a point: lift (m/s, up) and the inflow (m/s along x and z). */
+export interface ThermalAir { lift: number; vx: number; vz: number }
+
+function addThermal(th: Thermal, x: number, z: number, out: ThermalAir): void {
+	const dx = th.x - x, dz = th.z - z;
+	const d = Math.hypot(dx, dz);
+	const lift = th.strength * liftProfile(d, th.radius);
+	if (lift > out.lift) out.lift = lift;
+	const u = d / th.radius;
+	if (u >= INFLOW_REACH || d < 1e-3) return;
+	// Steady all the way in to the core, easing off right at the centre and beyond the edge.
+	const near = Math.min(1, d / INFLOW_CORE);
+	const far = u < 0.9 ? 1 : 1 - (u - 0.9) / (INFLOW_REACH - 0.9);
+	const pull = THERMAL_INFLOW * (th.strength / Math.max(1, th.peak)) * near * far;
+	out.vx += (dx / d) * pull;
+	out.vz += (dz / d) * pull;
+}
+
+/** Thermal lift and inflow at a point and time. Allocation-free: the sim calls it every step. */
+export function thermalAirAt(seed: number, x: number, y: number, z: number, t: number, out: ThermalAir): ThermalAir {
+	out.lift = 0;
+	out.vx = 0;
+	out.vz = 0;
 	const fade = cloudFade(y);
-	if (fade <= 0) return 0;
-	let best = 0;
-	if (startThermal(seed, t, scratch)) {
-		best = scratch.strength * liftProfile(Math.hypot(x - scratch.x, z - scratch.z), scratch.radius);
-	}
+	if (fade <= 0) return out;
+	if (startThermal(seed, t, scratch)) addThermal(scratch, x, z, out);
 	const cx = Math.floor(x / THERMAL_CELL), cz = Math.floor(z / THERMAL_CELL);
 	for (let j = -1; j <= 1; j++) {
 		for (let i = -1; i <= 1; i++) {
-			if (!cellThermal(seed, cx + i, cz + j, t, scratch)) continue;
-			const lift = scratch.strength * liftProfile(Math.hypot(x - scratch.x, z - scratch.z), scratch.radius);
-			if (lift > best) best = lift;
+			if (cellThermal(seed, cx + i, cz + j, t, scratch)) addThermal(scratch, x, z, out);
 		}
 	}
-	return best * fade;
+	const pull = Math.hypot(out.vx, out.vz);
+	// Overlapping inflows never add up to more than one thermal's.
+	if (pull > THERMAL_INFLOW) {
+		out.vx *= THERMAL_INFLOW / pull;
+		out.vz *= THERMAL_INFLOW / pull;
+	}
+	out.lift *= fade;
+	out.vx *= fade;
+	out.vz *= fade;
+	return out;
+}
+
+const liftScratch: ThermalAir = { lift: 0, vx: 0, vz: 0 };
+
+/** Vertical speed of the thermals' air (m/s, up) at a point and time. */
+export function liftAt(seed: number, x: number, y: number, z: number, t: number): number {
+	return thermalAirAt(seed, x, y, z, t, liftScratch).lift;
 }

@@ -1,6 +1,7 @@
 import type { Plan } from "../game/autopilot";
 import type { Sim } from "../game/flight";
-import { type BeaconItem, drawBeacon, drawBeaconArrow, drawIdealPath, queueBeacons } from "./beacon-draw";
+import { AirMotes } from "./air-motes";
+import { type BeaconItem, drawBeacon, drawBeaconArrow, drawBeaconMarkers, drawIdealPath, queueBeacons } from "./beacon-draw";
 import { Camera } from "./camera";
 import type { Palette } from "./palette";
 import { drawPlane } from "./plane-draw";
@@ -13,6 +14,7 @@ type Item = QuadItem | BeaconItem | CloudItem | ColumnItem;
 /** Painter's-algorithm renderer for one canvas. */
 export class Scene {
 	readonly cam = new Camera();
+	private readonly motes = new AirMotes();
 	private readonly items: Item[] = [];
 	private ratio = 1;
 
@@ -27,24 +29,27 @@ export class Scene {
 	}
 
 	/** `plan` overlays the autopilot's route (the ideal path) while flying. */
-	draw(sim: Sim, pal: Palette, restT: number | null, plan: Plan | null = null): void {
+	draw(sim: Sim, pal: Palette, restT: number | null, plan: Plan | null = null, dt = 0): void {
 		const { ctx, cam, items } = this;
 		ctx.setTransform(this.ratio, 0, 0, this.ratio, 0, 0);
 		cam.follow(sim);
 		drawSky(ctx, cam, sim, pal);
 		items.length = 0;
 		queueTerrain(sim, cam, pal, items as QuadItem[]);
-		queueBeacons(sim, cam, pal, items as BeaconItem[]);
+		queueBeacons(sim, cam, items as BeaconItem[]);
 		queueThermals(sim, cam, items as (CloudItem | ColumnItem)[]);
 		items.sort((a, b) => b.z - a.z);
 		ctx.lineJoin = "round";
 		for (const it of items) {
 			if (it.kind === 0) drawQuad(ctx, cam, it);
-			else if (it.kind === 1) drawBeacon(ctx, cam, sim, it);
-			else if (it.kind === 2) drawCloud(ctx, it, pal);
+			else if (it.kind === 1) drawBeacon(ctx, cam, sim, it, pal);
+			else if (it.kind === 2) drawCloud(ctx, cam, it, pal);
 			else drawColumn(ctx, cam, sim, it, pal);
 		}
+		this.motes.update(sim, cam, dt);
+		this.motes.draw(ctx, cam, pal);
 		if (plan && sim.phase === "flying") drawIdealPath(ctx, cam, sim, plan, pal);
+		drawBeaconMarkers(ctx, cam, sim, pal);
 		drawPlane(ctx, cam, sim, pal, restT);
 		if (sim.phase === "flying") drawBeaconArrow(ctx, cam, sim, pal);
 	}

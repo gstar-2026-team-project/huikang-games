@@ -9,9 +9,12 @@ const GROUND_LOW = 60;
 const GROUND_DANGER = 25;
 /** Warn when the ground is this many seconds away at the current sink rate. */
 const IMPACT_WARN_SECONDS = 3;
-/** Variometer bands (m/s): green when going up, red when coming down faster than any steady glide. */
-const VARIO_CLIMBING = 0.5;
-const VARIO_SINKING_FAST = -9;
+/** Variometer bands (m/s): green when going up, red when coming down. */
+const VARIO_CLIMBING = 0.2;
+const VARIO_SINKING = -0.2;
+/** Climb rate (m/s) that fills the variometer bar to the top (or the bottom). */
+export const VARIO_FULL_SCALE = 8;
+const TIP_SECONDS = 4.5;
 /** The daily clock turns red this many seconds before the limit. */
 const TIME_LOW_SECONDS = 30;
 
@@ -25,6 +28,12 @@ export function sinkingIntoGround(agl: number, climbRate: number): boolean {
 export function clockText(seconds: number): string {
 	const s = Math.max(0, Math.floor(seconds));
 	return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/** Variometer bar fill, -1 (full sink) … 1 (full climb); eased so small rates still show. */
+export function varioFill(climb: number): number {
+	const k = Math.min(1, Math.abs(climb) / VARIO_FULL_SCALE) ** 0.75;
+	return climb < 0 ? -k : k;
 }
 
 /** "+3.2" or "-5.0": the glider's climb rate in m/s. */
@@ -41,6 +50,7 @@ export class Hud {
 	private last = new Map<string, string>();
 	private toastT = 0;
 	private bannerT = 0;
+	private tipT = 0;
 	private lastRivalKey = "";
 
 	constructor(private readonly ui: ShellRefs) {}
@@ -73,6 +83,17 @@ export class Hud {
 		this.bannerT = BANNER_SECONDS;
 	}
 
+	/** A coaching tip under the glider, for a few seconds. */
+	tip(message: string): void {
+		this.ui.tip.textContent = message;
+		this.tipT = TIP_SECONDS;
+	}
+
+	clearTip(): void {
+		this.tipT = 0;
+		this.style("tipA", this.ui.tip, "opacity", "0");
+	}
+
 	/** True while a toast or banner is still fading and needs frames. */
 	get busy(): boolean {
 		return this.toastT > 0 || this.bannerT > 0;
@@ -90,10 +111,13 @@ export class Hud {
 		const agl = Math.max(0, p.y - groundBelow(sim));
 		this.text("alt", ui.altVal, String(Math.round(agl)));
 		this.flag("agl", ui.altPill, agl < GROUND_DANGER ? "danger" : agl < GROUND_LOW ? "near" : "", ["danger", "near"]);
-		// Variometer: the one number that says whether this air is worth circling in.
-		const climb = flying ? sim.climb : 0;
+		// Variometer: the one reading that says whether this air is worth circling in.
+		const climb = flying ? sim.vario : 0;
+		const state = climb > VARIO_CLIMBING ? "up" : climb < VARIO_SINKING ? "down" : "";
 		this.text("vario", ui.varioVal, varioText(climb));
-		this.flag("vario", ui.varioPill, climb > VARIO_CLIMBING ? "up" : climb < VARIO_SINKING_FAST ? "down" : "", ["up", "down"]);
+		this.flag("vario", ui.varioBox, state, ["up", "down"]);
+		this.text("varioWord", ui.varioWord, state === "up" ? "Climb" : state === "down" ? "Sink" : "Level");
+		this.style("varioFill", ui.varioFill, "transform", `scaleY(${varioFill(climb).toFixed(3)})`);
 		this.text("spd", ui.spdVal, String(Math.round(p.v * 3.6)));
 		this.style("knob", ui.knob, "transform", `translate(${(knob.x * 46).toFixed(0)}px,${(-knob.y * 46).toFixed(0)}px)`);
 		let warn = "";
@@ -105,6 +129,10 @@ export class Hud {
 			this.toastT = Math.max(0, this.toastT - dt);
 			const a = Math.min(1, this.toastT / TOAST_FADE);
 			this.style("toastA", ui.toast, "opacity", a.toFixed(2));
+		}
+		if (this.tipT > 0) {
+			this.tipT = Math.max(0, this.tipT - dt);
+			this.style("tipA", ui.tip, "opacity", Math.min(1, this.tipT / TOAST_FADE, (TIP_SECONDS - this.tipT) / 0.2).toFixed(2));
 		}
 		if (this.bannerT > 0) {
 			this.bannerT = Math.max(0, this.bannerT - dt);

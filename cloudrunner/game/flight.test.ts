@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { BEST_GLIDE, BEST_GLIDE_SPEED, CRASH_DURATION, DT, STALL_SPEED } from "./constants";
-import { type Controls, createSim, glideRatio, groundBelow, NO_CONTROLS, type Sim, type SimEvent, sinkRate, stepSim, trimPitch } from "./flight";
+import { CAMERA_BANK, type Controls, createSim, glideRatio, groundBelow, NO_CONTROLS, type Sim, type SimEvent, sinkRate, stepSim, trimPitch } from "./flight";
 import { DAILY, DAILY_SECONDS, DAILY_TURNPOINTS, FREE } from "./modes";
 import { CLOUD_BASE, START_THERMAL, windOf } from "./thermals";
 
@@ -13,29 +13,34 @@ function fly(sim: Sim, seconds: number, ctl: Controls | ((sim: Sim) => Controls)
 /** Height above the cloud base, where no thermal reaches. */
 const HIGH = CLOUD_BASE + 150;
 
-/** A sim moved to still air, high over open country, at speed v on its steady glide. */
+/** A sim moved to still air, high over open country, at speed v on its steady glide, heading north. */
 function inStillAir(v: number): Sim {
 	const sim = createSim(5);
-	Object.assign(sim.plane, { x: 60_000, z: 60_000, y: HIGH, v, pitch: trimPitch(v) });
+	Object.assign(sim.plane, { x: 60_000, z: 60_000, y: HIGH, v, pitch: trimPitch(v), yaw: 0 });
 	return sim;
 }
 
-test("the glide is about 8:1 near 40 m/s and clearly worse when fast or near the stall", () => {
+test("the glide is about 9:1 near 30 m/s (108 km/h) and clearly worse when fast or near the stall", () => {
 	expect(glideRatio(BEST_GLIDE_SPEED)).toBeCloseTo(BEST_GLIDE, 6);
-	expect(BEST_GLIDE).toBeGreaterThanOrEqual(7);
-	expect(BEST_GLIDE).toBeLessThanOrEqual(8);
+	expect(BEST_GLIDE_SPEED * 3.6).toBeCloseTo(108, 6);
+	expect(BEST_GLIDE).toBeGreaterThanOrEqual(8);
+	expect(BEST_GLIDE).toBeLessThanOrEqual(10);
 	expect(glideRatio(60)).toBeLessThan(6);
 	expect(glideRatio(80)).toBeLessThan(4);
 	expect(glideRatio(STALL_SPEED)).toBeLessThan(glideRatio(BEST_GLIDE_SPEED));
 	expect(sinkRate(BEST_GLIDE_SPEED)).toBeCloseTo(BEST_GLIDE_SPEED / Math.hypot(1, BEST_GLIDE), 6);
 });
 
-test("hands off, the glider holds its speed and comes down the glide slope", () => {
+test("hands off, the glider holds its speed and comes down the glide slope, drifting with the wind", () => {
 	const sim = inStillAir(BEST_GLIDE_SPEED);
-	const { y, z } = sim.plane;
+	const { x, y, z } = sim.plane;
+	const wind = windOf(5);
 	fly(sim, 12);
 	expect(sim.plane.v).toBeCloseTo(BEST_GLIDE_SPEED, 1);
-	expect((sim.plane.z - z) / (y - sim.plane.y)).toBeCloseTo(BEST_GLIDE, 1);
+	// Through the air it flies the glide slope; over the ground the wind carries it as well.
+	const t = sim.elapsed;
+	expect(Math.hypot(sim.plane.x - x - wind.x * t, sim.plane.z - z - wind.z * t) / (y - sim.plane.y)).toBeCloseTo(BEST_GLIDE, 1);
+	expect(sim.plane.x - x).toBeCloseTo(wind.x * t, 3);
 	expect(sim.climb).toBeCloseTo(-sinkRate(BEST_GLIDE_SPEED), 1);
 	expect(sim.lift).toBe(0);
 });
@@ -83,6 +88,25 @@ test("bank turns the glider, and a slower glider turns tighter", () => {
 	expect(left.plane.roll).toBeLessThan(-0.8);
 });
 
+test("half stick circles about 100–160 m across at the cruising speed: small enough to stay inside a thermal", () => {
+	const sim = inStillAir(BEST_GLIDE_SPEED);
+	const wind = windOf(5);
+	let minX = Infinity, maxX = -Infinity;
+	for (let t = 0; t < 30; t += DT) {
+		stepSim(sim, { roll: 0.5, pitch: 0 }, DT, []);
+		if (t < 5) continue;
+		// Measured in the air, which the glider drifts with.
+		const ax = sim.plane.x - wind.x * sim.elapsed;
+		minX = Math.min(minX, ax);
+		maxX = Math.max(maxX, ax);
+	}
+	expect(maxX - minX).toBeGreaterThan(100);
+	expect(maxX - minX).toBeLessThan(160);
+	// The camera leans with only a small share of the bank: the horizon stays nearly level.
+	expect(Math.abs(sim.camRoll)).toBeLessThan(0.2);
+	expect(CAMERA_BANK).toBeLessThanOrEqual(0.2);
+});
+
 test("rising air carries the glider up, and the variometer shows it", () => {
 	const sim = createSim(9);
 	const wind = windOf(9);
@@ -97,11 +121,14 @@ test("rising air carries the glider up, and the variometer shows it", () => {
 	expect(sim.lift).toBeCloseTo(START_THERMAL.strength, 3);
 	expect(sim.climb).toBeCloseTo(START_THERMAL.strength - sinkRate(BEST_GLIDE_SPEED), 0);
 	expect(sim.plane.y).toBeGreaterThan(y0 + 60);
+	// The variometer follows the climb with a lag of about a second.
+	expect(sim.vario).toBeCloseTo(sim.climb, 0);
 	// The same glide outside the thermal only comes down.
 	const out = createSim(9);
 	out.plane.y = HIGH;
 	fly(out, 5);
-	expect(out.climb).toBeLessThan(-4);
+	expect(out.climb).toBeCloseTo(-sinkRate(BEST_GLIDE_SPEED), 1);
+	expect(out.vario).toBeLessThan(-3);
 });
 
 test("a turnpoint counts once, at any height, the moment the glider is within its radius", () => {

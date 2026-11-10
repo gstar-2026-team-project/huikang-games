@@ -3,8 +3,11 @@ import { forward, type Sim } from "../game/flight";
 import { surfaceHeight } from "../game/terrain";
 
 export const NEAR = 1.5;
+const right = [0, 0, 0];
 const CHASE_BACK = 28;
-const CHASE_UP = 6;
+const CHASE_UP = 3.6;
+/** Share of the glider's pitch the camera follows: the horizon bobs less than the nose. */
+const CAMERA_PITCH = 0.6;
 
 /** Chase camera behind the plane, and the projection onto the screen. */
 export class Camera {
@@ -17,13 +20,16 @@ export class Camera {
 	private baseF = 1;
 	private zoom = 1;
 	horizonY = 0;
+	/** How far the horizon is tilted on screen (rad): billboards turn with it. */
+	screenRoll = 0;
 
 	resize(w: number, h: number): void {
 		this.W = w;
 		this.H = h;
-		this.baseF = Math.max(w, h * 0.75) * 0.95;
+		// Wide but short windows get a wider view, so the glider stays clear of the variometer below it.
+		this.baseF = Math.min(Math.max(w, h * 0.75) * 0.95, h * 1.4);
 		this.F = this.baseF * this.zoom;
-		this.horizonY = h * 0.45;
+		this.horizonY = h * 0.44;
 	}
 
 	follow(sim: Sim): void {
@@ -43,8 +49,11 @@ export class Camera {
 		const gh = surfaceHeight(sim.terrain, this.x, this.z) + 2;
 		if (this.y < gh) this.y = gh;
 		this.cYaw = Math.cos(p.yaw); this.sYaw = Math.sin(p.yaw);
-		this.cp = Math.cos(p.pitch); this.sp = Math.sin(p.pitch);
+		const pitch = Math.max(-0.35, Math.min(0.3, p.pitch * CAMERA_PITCH));
+		this.cp = Math.cos(pitch); this.sp = Math.sin(pitch);
 		this.cr = Math.cos(sim.camRoll); this.sr = Math.sin(sim.camRoll);
+		this.dir(Math.cos(p.yaw), 0, -Math.sin(p.yaw), right);
+		this.screenRoll = Math.atan2(-(right[1] ?? 0), right[0] ?? 1);
 	}
 
 	/** Rotate a world-space direction into camera space. */

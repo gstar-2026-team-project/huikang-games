@@ -16,6 +16,7 @@
   --ctl-bg: rgba(255,255,255,0.35);
   --ctl-line: rgba(19,49,74,0.45);
   --edge: calc(24px + 8px);
+  --vbar-bg: rgba(19,49,74,0.14);
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -26,6 +27,7 @@
     --ctl-bg: rgba(10,20,30,0.35);
     --ctl-line: rgba(230,240,248,0.45);
     --good: #57c46a;
+    --vbar-bg: rgba(230,240,248,0.14);
   }
 }
 
@@ -44,10 +46,24 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; co
 #alt.near b { color: var(--accent); }
 #alt.danger { box-shadow: inset 0 0 0 2px var(--danger); background: var(--danger); }
 #alt.danger b, #alt.danger small { color: #fff; }
-#vario.up { box-shadow: inset 0 0 0 2px var(--good); }
-#vario.up b { color: var(--good); }
-#vario.down { box-shadow: inset 0 0 0 2px var(--danger); }
-#vario.down b { color: var(--danger); }
+/* Variometer: a bar that fills up (green) in lift and down (red) in sink, with the reading beside it. */
+#vario { position: absolute; left: 50%; bottom: calc(var(--sab) + 22px); transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 10px 14px 10px 12px; border-radius: 18px; background: var(--hud-bg); pointer-events: none; box-shadow: 0 2px 10px rgba(0,0,0,.18); }
+#root:not([data-screen="play"]) #vario { display: none; }
+#vario .vbar { position: relative; width: 16px; height: 116px; border-radius: 8px; background: var(--vbar-bg); overflow: hidden; }
+#vario .vfill { position: absolute; left: 0; right: 0; top: 0; height: 50%; transform-origin: 50% 100%; transform: scaleY(0); background: var(--ctl-line); }
+#vario.up .vfill { background: var(--good); }
+#vario.down .vfill { background: var(--danger); }
+#vario .vzero { position: absolute; left: -2px; right: -2px; top: calc(50% - 1px); height: 2px; background: var(--hud-fg); }
+#vario .vtick { position: absolute; left: 0; width: 5px; height: 1px; background: var(--hud-fg); opacity: .45; }
+#vario .t1 { top: 12.5%; } #vario .t2 { top: 25%; } #vario .t3 { top: 75%; } #vario .t4 { top: 87.5%; }
+#vario .vread { display: flex; flex-direction: column; align-items: flex-start; min-width: 58px; }
+#vario .vread b { font-size: 28px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+#vario .vread small { font-size: 11px; opacity: .7; }
+#vario .vword { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; opacity: .8; }
+#vario.up .vread b, #vario.up .vword { color: var(--good); opacity: 1; }
+#vario.down .vread b, #vario.down .vword { color: var(--danger); opacity: 1; }
+#tip { position: absolute; left: 50%; top: 23%; transform: translateX(-50%); max-width: min(86%, 420px); padding: 9px 18px; border-radius: 18px; background: var(--panel-bg); border-left: 5px solid var(--good); color: var(--hud-fg); font-weight: 700; font-size: 15px; text-align: center; pointer-events: none; opacity: 0; box-shadow: 0 2px 10px rgba(0,0,0,.18); }
+#root:not([data-screen="play"]) #tip { display: none; }
 #map { position: absolute; top: calc(var(--sat) + 62px); right: calc(var(--sar) + 10px); width: 104px; height: 104px; border-radius: 50%; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
 #root:not([data-screen="play"]) #map { display: none; }
 #rival { position: absolute; top: calc(var(--sat) + 62px); left: calc(var(--sal) + 10px); display: flex; align-items: center; gap: 6px; min-height: 36px; padding: 3px 12px 3px 4px; border-radius: 18px; border: 0; background: var(--hud-bg); color: var(--hud-fg); font: 600 13px system-ui, sans-serif; white-space: nowrap; max-width: calc(100% - 140px - var(--sal) - var(--sar)); }
@@ -70,13 +86,24 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; co
 #knob { position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; margin: -29px 0 0 -29px; border-radius: 50%; background: var(--hud-bg); border: 2px solid var(--ctl-line); pointer-events: none; }
 #invert, #path { position: absolute; left: calc(var(--sal) + var(--edge)); bottom: calc(var(--sab) + 180px); min-height: 44px; padding: 0 14px; border-radius: 22px; border: 2px solid var(--ctl-line); background: var(--hud-bg); color: var(--hud-fg); font: 600 12px system-ui, sans-serif; }
 #path { left: calc(var(--sal) + var(--edge) + 126px); }
+#mute { position: absolute; left: calc(var(--sal) + var(--edge) + 252px); bottom: calc(var(--sab) + 180px); min-height: 44px; padding: 0 12px; border-radius: 22px; border: 2px solid var(--ctl-line); background: var(--hud-bg); color: var(--hud-fg); font: 600 12px system-ui, sans-serif; }
+#mute[aria-pressed="true"] { opacity: .7; }
+/* Phones: the stick takes the bottom left, so the variometer moves to the bottom right. */
+@media (max-width: 560px) {
+  #vario { left: auto; right: calc(var(--sar) + 16px); transform: none; bottom: calc(var(--sab) + 28px); }
+  #mute { left: auto; right: calc(var(--sar) + 16px); bottom: calc(var(--sab) + 180px); }
+}
 #path[aria-pressed="true"] { border-color: var(--accent); }
 #controls #hint { position: absolute; left: 0; right: 0; bottom: calc(var(--sab) + 250px); text-align: center; font-size: 14px; font-weight: 600; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.5); pointer-events: none; }
 #overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 0 var(--edge); }
 #overlay[hidden] { display: none; }
-#panel { background: var(--panel-bg); border-radius: 20px; padding: 20px 24px; text-align: center; max-width: 290px; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
+#panel { background: var(--panel-bg); border-radius: 20px; padding: 20px 24px; text-align: center; max-width: 320px; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
 #panel h2 { margin: 0 0 6px; font-size: 22px; }
 #panel p { margin: 0 0 14px; font-size: 14px; opacity: .8; line-height: 1.4; }
+#pSteps { margin: -4px 0 14px; padding: 0 0 0 20px; text-align: left; font-size: 13px; line-height: 1.35; }
+#pSteps[hidden] { display: none; }
+#pSteps li { margin: 0 0 5px; }
+#pSteps li::marker { font-weight: 800; color: var(--accent); }
 #pBody { display: flex; flex-direction: column; gap: 8px; }
 #pBody button { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; min-height: 48px; padding: 4px 14px; border: 2px solid var(--ctl-line); border-radius: 16px; background: transparent; color: var(--hud-fg); font: 700 15px system-ui, sans-serif; }
 #pBody button small { font-size: 12px; font-weight: 500; opacity: .75; }
@@ -88,7 +115,11 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; co
 @media (max-height: 560px) {
   #stickZone { width: 116px; height: 116px; bottom: calc(var(--sab) + 12px); }
   #knob { width: 48px; height: 48px; margin: -24px 0 0 -24px; }
-  #invert, #path { bottom: calc(var(--sab) + 138px); }
+  #invert, #path, #mute { bottom: calc(var(--sab) + 138px); }
+  #vario { bottom: calc(var(--sab) + 12px); padding: 6px 10px; }
+  #vario .vbar { height: 84px; }
+  #vario .vread b { font-size: 22px; }
+  #tip { top: calc(var(--sat) + 56px); font-size: 14px; max-width: calc(100% - 240px); }
   #controls #hint { bottom: calc(var(--sab) + 190px); }
   .pill { padding: 3px 7px; }
   .pill b { font-size: 15px; }
@@ -98,12 +129,15 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; co
   #panel { padding: 14px 18px; }
   #panel h2 { font-size: 19px; margin-bottom: 4px; }
   #panel p { margin-bottom: 10px; font-size: 13px; }
+  #pSteps { font-size: 12px; margin-bottom: 8px; }
+  #pSteps li { margin-bottom: 3px; }
   #pBody { gap: 6px; }
   #pBody button { min-height: 44px; padding: 2px 12px; }
 }
 @media (max-height: 430px) {
-  #root[data-screen="home"] #pText { display: none; }
+  #root[data-screen="home"] #pText, #root[data-screen="home"] #pSteps { display: none; }
   #controls #hint { display: none; }
   #invert { bottom: calc(var(--sab) + 12px); left: calc(var(--sal) + var(--edge) + 128px); }
   #path { bottom: calc(var(--sab) + 12px); left: calc(var(--sal) + var(--edge) + 254px); }
+  #mute { bottom: calc(var(--sab) + 12px); left: auto; right: calc(var(--sar) + 120px); }
 }

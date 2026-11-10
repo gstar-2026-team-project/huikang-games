@@ -22,7 +22,7 @@ export interface Turnpoint {
 
 /** Launch height: well clear of every hill between the launch point and the first beacon. */
 export function startAltitude(t: TerrainPhases): number {
-	const ground = highestGround(t, 0, 0, 0, FIRST_TURNPOINT_DISTANCE + 100, 10);
+	const ground = highestGround(t, 0, 0, 0, FIRST_TURNPOINT_DISTANCE + 100, 50);
 	return Math.max(MIN_START_ALTITUDE, ground + START_CLEARANCE);
 }
 

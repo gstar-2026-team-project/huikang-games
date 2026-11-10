@@ -4,6 +4,7 @@ import { thermalsNear } from "../game/thermals";
 import { dailyBoardId, LEADERBOARD_ID, type RunEndReason } from "../synced-store/constants";
 import type { BoardEntryView, StoreView } from "../synced-store/data/view";
 import type { AppProps } from "./app-contract";
+import { Coach, TIPS } from "./coach";
 import type { FlightInput } from "./controls";
 import type { Hud } from "./hud";
 import { homePanel, loadingPanel, overPanel, type PanelAction, type PanelModel, pausedPanel, renderPanel } from "./menu";
@@ -24,6 +25,10 @@ export interface CloudrunnerProbe {
 	speed: number;
 	/** climb rate, m/s up */
 	climb: number;
+	/** the variometer reading: the climb rate smoothed the way the HUD shows it */
+	vario: number;
+	/** vertical speed of the air around the glider, m/s up */
+	air: number;
 	/** metres above the ground below */
 	agl: number;
 	elapsed: number;
@@ -63,6 +68,7 @@ export class FlightController {
 	private hintShown = true;
 	private lastOver: PanelModel | null = null;
 	private readonly events: SimEvent[] = [];
+	private readonly coach = new Coach();
 	onScreenChange: () => void = () => undefined;
 	/** Asked before a daily flight: today's date key, refreshing the view if the day rolled over. */
 	today: () => string = () => this.view?.day ?? "";
@@ -98,6 +104,8 @@ export class FlightController {
 			x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch,
 			speed: p.v,
 			climb: sim.climb,
+			vario: sim.vario,
+			air: sim.lift,
 			agl: p.y - groundBelow(sim),
 			elapsed: sim.elapsed,
 			turnpoints: sim.next,
@@ -160,6 +168,8 @@ export class FlightController {
 		this.runId = runId;
 		this.sim = createSim(seed, mode.kind === "daily" ? DAILY : FREE);
 		this.passed = new Set();
+		this.coach.reset();
+		this.hud.clearTip();
 		this.input.release();
 		this.call(
 			this.props.store.mutate.startRun({
@@ -190,6 +200,10 @@ export class FlightController {
 		const ctl = this.sim.phase === "flying" ? this.input.read() : NO_CONTROLS;
 		const before = this.sim.next;
 		stepSim(this.sim, ctl, dt, this.events);
+		if (this.sim.phase === "flying") {
+			const tip = this.coach.step(this.sim.vario, ctl.roll, dt);
+			if (tip) this.hud.tip(TIPS[tip]);
+		}
 		if (this.sim.next !== before) this.checkOvertakes(before, this.sim.next);
 		for (const e of this.events) this.handle(e);
 		this.events.length = 0;
@@ -223,6 +237,7 @@ export class FlightController {
 	/** Persist the result the moment it is known; only the reveal waits. */
 	private finish(reason: RunEndReason): void {
 		this.input.release();
+		this.hud.clearTip();
 		this.hud.toast(END_TOAST[reason]);
 		if (!this.runId) return;
 		this.call(this.props.store.mutate.finishRun({ runId: this.runId, endedAt: Date.now(), reason, ...this.result() }));

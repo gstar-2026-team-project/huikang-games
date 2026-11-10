@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { clockText, sinkingIntoGround, varioText } from "./hud";
+import { clockText, sinkingIntoGround, VARIO_FULL_SCALE, varioFill, varioText } from "./hud";
+import { BEEP_THRESHOLD, beepFor } from "./vario-audio";
 
 test("the clock reads minutes and seconds flown", () => {
 	expect(clockText(0)).toBe("0:00");
@@ -21,4 +22,21 @@ test("the pull-up warning comes on low or when the ground is seconds away, not i
 	expect(sinkingIntoGround(20, 4)).toBe(false);
 	expect(sinkingIntoGround(100, -40)).toBe(true);
 	expect(sinkingIntoGround(100, -20)).toBe(false);
+});
+
+test("the variometer bar fills up in lift and down in sink, and small rates still show", () => {
+	expect(varioFill(0)).toBe(0);
+	expect(varioFill(VARIO_FULL_SCALE)).toBe(1);
+	expect(varioFill(-VARIO_FULL_SCALE * 2)).toBe(-1);
+	expect(varioFill(1)).toBeGreaterThan(1 / VARIO_FULL_SCALE);
+	expect(varioFill(-4)).toBeCloseTo(-varioFill(4), 9);
+	expect(varioFill(3)).toBeGreaterThan(varioFill(2));
+});
+
+test("the audible vario beeps higher and faster the faster the climb", () => {
+	const slow = beepFor(1), fast = beepFor(6);
+	expect(fast.freq).toBeGreaterThan(slow.freq);
+	expect(fast.period).toBeLessThan(slow.period);
+	expect(beepFor(50)).toEqual(beepFor(10));
+	expect(BEEP_THRESHOLD).toBeGreaterThan(0);
 });

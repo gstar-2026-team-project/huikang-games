@@ -14,9 +14,9 @@ import { CLOUD_BASE, cloudFade, liftProfile, THERMAL_FADE, type Thermal, thermal
 /** Glide the planner counts on (the real one is better: that is the margin). */
 export const PLAN_GLIDE = 6.2;
 /** Speeds the autopilot flies (m/s): circling, cruising between climbs, and with height to spare. */
-export const CLIMB_SPEED = 34;
+export const CLIMB_SPEED = 27;
 export const CRUISE_SPEED = BEST_GLIDE_SPEED + 8;
-export const DASH_SPEED = 58;
+export const DASH_SPEED = 50;
 /** Height above the ground to keep on the way (m), and to arrive with at a turnpoint or a thermal. */
 const PATH_CLEARANCE = 60;
 const TURNPOINT_ARRIVAL = 130;
@@ -35,7 +35,7 @@ const WORTH_STOPPING = 60;
 const LEAVE_BEFORE = 3;
 /** A thermal is worth flying to only if it will still give this many seconds of climb on arrival. */
 const MIN_CLIMB_SECONDS = 8;
-/** Radius the autopilot circles at (m): about the tightest turn at CLIMB_SPEED. */
+/** Radius the autopilot circles at (m): inside the core of any thermal. */
 const CIRCLE_RADIUS = 62;
 /** Seconds lost finding the core of a thermal before the climb settles. */
 const CENTERING_SECONDS = 5;
@@ -52,7 +52,7 @@ const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi 
 /** More than this far off the line (rad) and this close to the target (m), fly TURN_SPEED to turn tightly. */
 const TURN_SLOWLY = 0.5;
 const TURN_SLOWLY_WITHIN = 700;
-const TURN_SPEED = 36;
+const TURN_SPEED = 30;
 
 export interface Plan {
 	/** glide: straight to the turnpoint. seek: on the way to a thermal. climb: circling in one. */

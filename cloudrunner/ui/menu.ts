@@ -14,8 +14,17 @@ export interface PanelButton {
 export interface PanelModel {
 	title: string;
 	text: string;
+	/** A short numbered how-to under the text (the menu's). */
+	steps?: string[];
 	buttons: PanelButton[];
 }
+
+/** How to fly, in three steps: shown on the menu. */
+export const HOW_TO: readonly string[] = [
+	"Fly to a cloud: the golden column under it is rising air.",
+	"When the vario turns green and beeps, hold a turn to circle and climb.",
+	"Glide on to the numbered beacon and cross its ring.",
+];
 
 export interface HomeFacts {
 	day: string;
@@ -26,7 +35,8 @@ export interface HomeFacts {
 export function homePanel(f: HomeFacts): PanelModel {
 	return {
 		title: "Ready to launch",
-		text: "No engine: circle under a cloud to climb, then glide to the next beacon.",
+		text: "No engine: rising air is your only way up.",
+		steps: [...HOW_TO],
 		buttons: [
 			{
 				action: "daily", primary: true, testid: "mode-daily", label: "Daily task",
@@ -99,11 +109,20 @@ export function loadingPanel(): PanelModel {
 
 /** Draw a panel model into the overlay. Buttons carry data-action for one delegated handler. */
 export function renderPanel(
-	refs: { pTitle: HTMLElement; pText: HTMLElement; pBody: HTMLElement },
+	refs: { pTitle: HTMLElement; pText: HTMLElement; pSteps: HTMLElement; pBody: HTMLElement },
 	model: PanelModel,
 ): void {
 	refs.pTitle.textContent = model.title;
 	refs.pText.textContent = model.text;
+	const steps = model.steps ?? [];
+	refs.pSteps.hidden = steps.length === 0;
+	refs.pSteps.replaceChildren(
+		...steps.map((text) => {
+			const li = document.createElement("li");
+			li.textContent = text;
+			return li;
+		}),
+	);
 	refs.pBody.replaceChildren(
 		...model.buttons.map((b) => {
 			const el = document.createElement("button");

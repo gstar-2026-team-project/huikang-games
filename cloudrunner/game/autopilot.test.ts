@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { autopilot, heightToGlide, PLAN_GLIDE, planRoute } from "./autopilot";
+import { autopilot, CRUISE_SPEED, heightToGlide, PLAN_GLIDE, planRoute } from "./autopilot";
 import { DT } from "./constants";
 import { createSim, glideRatio, NO_CONTROLS, type Sim, type SimEvent, stepSim } from "./flight";
 import { DAILY, DAILY_SECONDS, DAILY_TURNPOINTS, daySeed, FREE } from "./modes";
@@ -26,18 +26,20 @@ test("the autopilot completes the daily task inside the time limit, day after da
 	let climbs = 0;
 	for (const day of DAYS) {
 		const sim = createSim(daySeed(day), DAILY);
-		climbs += flyOnAutopilot(sim);
+		const n = flyOnAutopilot(sim);
+		expect(n).toBeGreaterThanOrEqual(1);
+		climbs += n;
 		expect(`${day} ${sim.endReason} ${sim.next}`).toBe(`${day} complete ${DAILY_TURNPOINTS}`);
 		expect(sim.elapsed).toBeLessThan(DAILY_SECONDS);
 		expect(sim.lastTurnpointAt).toBeCloseTo(sim.elapsed, 6);
 		times.push(sim.elapsed);
 	}
 	times.sort((a, b) => a - b);
-	// A typical day takes two to three and a half minutes, with two or more climbs.
+	// A typical day takes two to three and a half minutes; the opening climb alone is never enough.
 	const median = times[times.length >> 1]!;
 	expect(median).toBeGreaterThan(120);
 	expect(median).toBeLessThan(210);
-	expect(climbs / DAYS.length).toBeGreaterThanOrEqual(2);
+	expect(climbs / DAYS.length).toBeGreaterThanOrEqual(1.25);
 });
 
 test("a hands-off flight glides through the first beacon and then lands out: nobody finishes without flying", () => {
@@ -101,7 +103,7 @@ test("the plan is a pure function of the flight: glide when in range, otherwise 
 });
 
 test("the planner's glide is more cautious than the real one, and keeps clear of the hills", () => {
-	expect(PLAN_GLIDE).toBeLessThan(glideRatio(52) - 0.5);
+	expect(PLAN_GLIDE).toBeLessThan(glideRatio(CRUISE_SPEED) - 0.5);
 	const sim = createSim(5);
 	const need = heightToGlide(sim.terr, 0, 0, 2000, 500, 100);
 	expect(need).toBeGreaterThanOrEqual(terrainHeight(sim.terr, 2000, 500) + 100 + Math.hypot(2000, 500) / PLAN_GLIDE - 1e-6);

@@ -34,7 +34,13 @@ test("opens on the mode menu, shows the daily score to beat, and launches the da
 		expect(container.dataset.screen).toBe("home");
 		expect(q("mode-daily")).toHaveTextContent("4 turnpoints, fastest wins");
 		expect(q("mode-free")).toHaveTextContent("Endless turnpoints");
-		expect(container.querySelector("#pText")).toHaveTextContent("circle under a cloud to climb");
+		expect(container.querySelector("#pText")).toHaveTextContent("rising air is your only way up");
+		// A three-step how-to: find the rising air, circle in it, glide on to the beacon.
+		const steps = [...container.querySelectorAll("[data-testid=how-to] li")].map((li) => li.textContent);
+		expect(steps).toHaveLength(3);
+		expect(steps[0]).toContain("Fly to a cloud");
+		expect(steps[1]).toContain("hold a turn");
+		expect(steps[2]).toContain("beacon");
 		// No daily scores yet: no leaderboard layer at all.
 		expect(q("rival")?.hidden).toBe(true);
 
@@ -61,6 +67,15 @@ test("opens on the mode menu, shows the daily score to beat, and launches the da
 		expect(probe?.agl).toBeGreaterThan(100);
 		expect(probe?.thermals.length).toBeGreaterThan(0);
 		expect(q("turnpoints")).toHaveTextContent("0");
+		expect(probe?.vario).toBeLessThan(0);
+		// The flight shows its variometer, the menu is gone, and the sound can be switched off.
+		expect(q("vario-box")).not.toBeNull();
+		expect(q("overlay")?.hidden).toBe(true);
+		expect(q("mute")).toHaveTextContent("Sound on");
+		q("mute")?.click();
+		expect(q("mute")).toHaveTextContent("Sound off");
+		expect(q("mute")?.getAttribute("aria-pressed")).toBe("true");
+		q("mute")?.click();
 	} finally {
 		unmount?.();
 		container.remove();
