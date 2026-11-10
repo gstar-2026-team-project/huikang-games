@@ -15,5 +15,9 @@
 	"sourceBundle": {
 		"dir": ".",
 		"visibility": "public"
-	}
+	},
+	"screenshots": [
+		"./assets/gallery/1-race.png",
+		"./assets/gallery/2-race.png"
+	]
 }
