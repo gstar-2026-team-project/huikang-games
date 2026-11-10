@@ -55,7 +55,21 @@ function waterColor(pal: Palette, look: Look, wx: number, wz: number, dist: numb
 	return mix(pal.water, pal.waterHi, g * 0.5);
 }
 
-function shade(pal: Palette, look: Look, h: [number, number, number, number], dist: number, wx: number, wz: number, cell: number): string {
+/**
+ * Colour of one ground face. `slopes`, when given, is a smoothed (dh/dx, dh/dz)
+ * taken over the neighbouring faces too, so flat-shaded neighbours do not
+ * contrast in hard lines along the grid.
+ */
+function shade(
+	pal: Palette,
+	look: Look,
+	h: [number, number, number, number],
+	dist: number,
+	wx: number,
+	wz: number,
+	cell: number,
+	slopes?: readonly [number, number],
+): string {
 	const [h0, h1, h2, h3] = h;
 	const hm = (h0 + h1 + h2 + h3) / 4;
 	const haze = dist < HAZE_START ? (0.12 * dist) / HAZE_START : 0.12 + 0.88 * Math.sqrt(Math.min(1, (dist - HAZE_START) / (HAZE_DIST - HAZE_START)));
@@ -63,8 +77,8 @@ function shade(pal: Palette, look: Look, h: [number, number, number, number], di
 	let col: RGB;
 	if (hm < 70) col = mix(pal.low, pal.mid, hm / 70);
 	else col = mix(pal.mid, pal.high, Math.min(1, (hm - 70) / 240));
-	const dhx = (h1 - h0 + (h2 - h3)) / (2 * cell);
-	const dhz = (h3 - h0 + (h2 - h1)) / (2 * cell);
+	const dhx = slopes ? slopes[0] : (h1 - h0 + (h2 - h3)) / (2 * cell);
+	const dhz = slopes ? slopes[1] : (h3 - h0 + (h2 - h1)) / (2 * cell);
 	const slope = Math.hypot(dhx, dhz);
 	// Steep ground is bare rock, banded into strata.
 	const rocky = Math.max(0, Math.min(1, (slope - 0.62) / 0.5));
@@ -104,11 +118,22 @@ export function queueTerrain(sim: Sim, cam: Camera, pal: Palette, items: QuadIte
 			const wx = (gx0 + i + 0.5) * CELL, wz = (gz0 + j + 0.5) * CELL;
 			const dist = Math.hypot(wx - cam.x, wz - cam.z);
 			if (dist > MAX_DIST) continue;
-			const col = shade(pal, look, [vh[a] ?? 0, vh[b] ?? 0, vh[c] ?? 0, vh[d] ?? 0], dist, wx, wz, CELL);
+			const col = shade(pal, look, [vh[a] ?? 0, vh[b] ?? 0, vh[c] ?? 0, vh[d] ?? 0], dist, wx, wz, CELL, smoothSlopes(i, j));
 			items.push({ kind: 0, z: Math.max((za + zb + zc + zd) / 4, 0.1) + 0.0001 * dist, a, b, c, d, col, far: false });
 		}
 	}
 	queueFar(sim, cam, pal, look, items);
+}
+
+const slopeOut: [number, number] = [0, 0];
+/** Slope of face (i, j) measured across it and one face either side, from the heights in `vh`. */
+function smoothSlopes(i: number, j: number): [number, number] {
+	const im = Math.max(0, i - 1), ip = Math.min(NV - 1, i + 2);
+	const jm = Math.max(0, j - 1), jp = Math.min(NV - 1, j + 2);
+	const at = (x: number, z: number) => vh[z * NV + x] ?? 0;
+	slopeOut[0] = (at(ip, j) + at(ip, j + 1) - at(im, j) - at(im, j + 1)) / (2 * (ip - im) * CELL);
+	slopeOut[1] = (at(i, jp) + at(i + 1, jp) - at(i, jm) - at(i + 1, jm)) / (2 * (jp - jm) * CELL);
+	return slopeOut;
 }
 
 /** The coarse far ring, skipping the cells the detailed grid already covers. */

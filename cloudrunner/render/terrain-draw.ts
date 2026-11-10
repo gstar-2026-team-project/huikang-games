@@ -39,7 +39,21 @@ const fh = new Float32Array(FAR_NV * FAR_NV);
 
 export interface QuadItem { kind: 0; z: number; a: number; b: number; c: number; d: number; col: string; far: boolean }
 
-function shade(pal: Palette, h: [number, number, number, number], dist: number, snow: number, wx: number, wz: number, cell = CELL): string {
+/**
+ * Colour of one ground face. `slopes`, when given, is a smoothed (dh/dx, dh/dz)
+ * taken over the neighbouring faces too, so flat-shaded neighbours do not
+ * contrast in hard lines along the grid.
+ */
+function shade(
+	pal: Palette,
+	h: [number, number, number, number],
+	dist: number,
+	snow: number,
+	wx: number,
+	wz: number,
+	cell = CELL,
+	slopes?: readonly [number, number],
+): string {
 	const [h0, h1, h2, h3] = h;
 	const hm = (h0 + h1 + h2 + h3) / 4;
 	let col: RGB;
@@ -47,8 +61,8 @@ function shade(pal: Palette, h: [number, number, number, number], dist: number, 
 	else if (hm < 70) col = mix(pal.low, pal.mid, hm / 70);
 	else if (hm < snow) col = mix(pal.mid, pal.high, Math.min(1, (hm - 70) / 160));
 	else col = mix(pal.high, pal.snow, Math.min(1, (hm - snow) / 60));
-	const dhx = (h1 - h0 + (h2 - h3)) / (2 * cell);
-	const dhz = (h3 - h0 + (h2 - h1)) / (2 * cell);
+	const dhx = slopes ? slopes[0] : (h1 - h0 + (h2 - h3)) / (2 * cell);
+	const dhz = slopes ? slopes[1] : (h3 - h0 + (h2 - h1)) / (2 * cell);
 	const nl = Math.hypot(dhx, 1, dhz);
 	const lit = 0.62 + 0.5 * Math.max(0, (-dhx * SUN[0] + SUN[1] - dhz * SUN[2]) / nl);
 	col = [col[0] * lit, col[1] * lit, col[2] * lit];
@@ -58,6 +72,17 @@ function shade(pal: Palette, h: [number, number, number, number], dist: number, 
 	// Clear close by, then thickening haze, so the far ring's big facets melt into the distance.
 	const haze = dist < HAZE_START ? (0.15 * dist) / HAZE_START : 0.15 + 0.85 * Math.sqrt(Math.min(1, (dist - HAZE_START) / (HAZE_DIST - HAZE_START)));
 	return rgb(mix(col, pal.haze, haze));
+}
+
+const slopeOut: [number, number] = [0, 0];
+/** Slope of face (i, j) measured across it and one face either side, from the heights in `vh`. */
+function smoothSlopes(i: number, j: number): [number, number] {
+	const im = Math.max(0, i - 1), ip = Math.min(NV - 1, i + 2);
+	const jm = Math.max(0, j - 1), jp = Math.min(NV - 1, j + 2);
+	const at = (x: number, z: number) => vh[z * NV + x] ?? 0;
+	slopeOut[0] = (at(ip, j) + at(ip, j + 1) - at(im, j) - at(im, j + 1)) / (2 * (ip - im) * CELL);
+	slopeOut[1] = (at(i, jp) + at(i + 1, jp) - at(i, jm) - at(i + 1, jm)) / (2 * (jp - jm) * CELL);
+	return slopeOut;
 }
 
 /** Project the grid around the camera and queue each visible quad. */
@@ -82,7 +107,7 @@ export function queueTerrain(sim: Sim, cam: Camera, pal: Palette, items: QuadIte
 			if (za < NEAR && zb < NEAR && zc < NEAR && zd < NEAR) continue;
 			const dist = Math.hypot((gx0 + i + 0.5) * CELL - cam.x, (gz0 + j + 0.5) * CELL - cam.z);
 			if (dist > MAX_DIST) continue;
-			const col = shade(pal, [vh[a] ?? 0, vh[b] ?? 0, vh[c] ?? 0, vh[d] ?? 0], dist, sim.terrain.snowLine, wind.x, wind.z);
+			const col = shade(pal, [vh[a] ?? 0, vh[b] ?? 0, vh[c] ?? 0, vh[d] ?? 0], dist, sim.terrain.snowLine, wind.x, wind.z, CELL, smoothSlopes(i, j));
 			items.push({ kind: 0, z: Math.max((za + zb + zc + zd) / 4, 0.1) + 0.0001 * dist, a, b, c, d, col, far: false });
 		}
 	}
