@@ -17,8 +17,19 @@
 		--edge: calc(24px + 8px);
 
 		/* World palette — the renderer reads these. */
-		--world-sky: #bfe3f5;
+		--world-sky: #cfeaf6;
+		--world-sky-top: #4a9cd6;
+		--world-sun: #fff0c4;
+		--world-cloud: #ffffff;
+		--world-island: #8fb3b8;
+		--world-light-key: #fff1d8;
+		--world-light-fill: #bcdcff;
 		--world-sea: #2f8fb8;
+		--world-sea-deep: #176a9c;
+		--world-shadow: #0b3550;
+		--world-plank: #e3c08a;
+		--world-glass: #27475c;
+		--world-crew: #ffb02e;
 		--world-fleck: #e6f6ff;
 		--world-hull: #f4f1ea;
 		--world-deck: #6b4a2f;
@@ -51,8 +62,19 @@
 	@media (prefers-color-scheme: dark) {
 		:root {
 			/* Same hues, lower lightness: dim the world, don't invert it. */
-			--world-sky: #2c4b5c;
+			--world-sky: #3d6276;
+			--world-sky-top: #173449;
+			--world-sun: #d6c79e;
+			--world-cloud: #8fa5b3;
+			--world-island: #35565f;
+			--world-light-key: #d9ccb6;
+			--world-light-fill: #7fa3c4;
 			--world-sea: #1b5877;
+			--world-sea-deep: #0e3f5e;
+			--world-shadow: #051a29;
+			--world-plank: #a88a5c;
+			--world-glass: #152a38;
+			--world-crew: #c98a26;
 			--world-fleck: #9fc4d6;
 			--world-hull: #cfcabd;
 			--world-deck: #4d3522;

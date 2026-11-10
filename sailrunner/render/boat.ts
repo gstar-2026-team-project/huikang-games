@@ -1,20 +1,23 @@
-import {
-	BufferGeometry,
-	CylinderGeometry,
-	DoubleSide,
-	ExtrudeGeometry,
-	Float32BufferAttribute,
-	Group,
-	Mesh,
-	MeshLambertMaterial,
-	Shape,
-} from "three";
+import { DoubleSide, Group, Mesh, MeshBasicMaterial, MeshLambertMaterial } from "three";
 import { MAX_SPEED } from "../game/constants";
 import { normalizeAngle, sailSide, trueWindAngle } from "../game/physics";
+import {
+	BOAT_LENGTH,
+	BOAT_SCALE,
+	boomGeometry,
+	bowWaveGeometry,
+	crewGeometry,
+	hullGeometry,
+	jibGeometry,
+	mainsailGeometry,
+	RIG,
+	rudderGeometry,
+	shadowGeometry,
+} from "./boat-parts";
 import type { Palette } from "./palette";
+import { SUN_DIRECTION } from "./water";
 
-/** Boat length in world units; marks are a few boat lengths wide. */
-export const BOAT_LENGTH = 6;
+export { BOAT_LENGTH, BOAT_SCALE };
 
 export interface BoatPose {
 	x: number;
@@ -29,101 +32,102 @@ export interface BoatModel {
 	dispose(): void;
 }
 
-function hullGeometry(): ExtrudeGeometry {
-	// Deck outline in the XZ plane, bow toward -Z.
-	const half = BOAT_LENGTH / 2;
-	const shape = new Shape();
-	shape.moveTo(0, -half);
-	shape.bezierCurveTo(1.1, -half * 0.55, 1.15, half * 0.3, 0.95, half);
-	shape.lineTo(-0.95, half);
-	shape.bezierCurveTo(-1.15, half * 0.3, -1.1, -half * 0.55, 0, -half);
-	const geometry = new ExtrudeGeometry(shape, {
-		depth: 0.7,
-		bevelEnabled: true,
-		bevelThickness: 0.25,
-		bevelSize: 0.12,
-		bevelSegments: 2,
-		curveSegments: 10,
-	});
-	// Extrusion runs along +Z; lay it flat so the deck faces up.
-	geometry.rotateX(Math.PI / 2);
-	geometry.translate(0, 0.55, 0);
-	return geometry;
-}
-
-function triangle(a: number[], b: number[], c: number[]): BufferGeometry {
-	const geometry = new BufferGeometry();
-	geometry.setAttribute("position", new Float32BufferAttribute([...a, ...b, ...c], 3));
-	geometry.computeVertexNormals();
-	return geometry;
-}
-
 /** Boom angle off the centreline for a given true wind angle (radians). */
 function boomAngle(twa: number): number {
 	const t = Math.min(1, Math.max(0, (twa - 0.66) / (Math.PI - 0.66)));
 	return 0.12 + t * 1.25;
 }
 
+/** Sails collapse to nothing at scale 0, which breaks their normals; keep a sliver. */
+function sailFill(value: number): number {
+	if (Math.abs(value) >= 0.06) return value;
+	return value < 0 ? -0.06 : 0.06;
+}
+
+/** Shadow centre offset and heading: it falls away from the sun. */
+const SHADOW_REACH = 3.6;
+const SUN_FLAT = Math.hypot(SUN_DIRECTION.x, SUN_DIRECTION.z);
+const SHADOW_X = -SUN_DIRECTION.x / SUN_FLAT;
+const SHADOW_Z = -SUN_DIRECTION.z / SUN_FLAT;
+
 export function createBoatModel(palette: Palette): BoatModel {
-	const material = (color: Palette[keyof Palette]) =>
-		new MeshLambertMaterial({ color, side: DoubleSide });
-	const hullMaterial = material(palette.hull);
-	const deckMaterial = material(palette.deck);
-	const sailMaterial = material(palette.sail);
-	const accentMaterial = material(palette.accent);
+	const solid = new MeshLambertMaterial({ vertexColors: true, side: DoubleSide });
+	// Sailcloth glows a little when backlit instead of going grey.
+	const cloth = new MeshLambertMaterial({
+		vertexColors: true,
+		side: DoubleSide,
+		emissive: palette.sail.clone().multiplyScalar(0.2),
+	});
+	const foam = new MeshBasicMaterial({
+		vertexColors: true,
+		transparent: true,
+		depthWrite: false,
+		side: DoubleSide,
+	});
 
 	const group = new Group();
+	/** Follows position and heading, and rides the swell. */
+	const frame = new Group();
+	/** Heels and pitches inside the frame. */
 	const heel = new Group();
-	group.add(heel);
+	frame.add(heel);
+	frame.scale.setScalar(BOAT_SCALE);
+	group.add(frame);
 
-	const hull = new Mesh(hullGeometry(), hullMaterial);
-	heel.add(hull);
-	const stripe = new Mesh(new CylinderGeometry(0.08, 0.08, BOAT_LENGTH * 0.62, 6), accentMaterial);
-	stripe.rotation.x = Math.PI / 2;
-	stripe.position.set(0, 0.62, 0.3);
-	heel.add(stripe);
-	const cockpit = new Mesh(new CylinderGeometry(0.55, 0.7, 0.3, 10), deckMaterial);
-	cockpit.position.set(0, 0.7, 1.6);
-	heel.add(cockpit);
+	heel.add(new Mesh(hullGeometry(palette), solid));
 
-	const mastX = 0;
-	const mastZ = -0.7;
-	const mastHeight = 8.5;
-	const mast = new Mesh(new CylinderGeometry(0.07, 0.1, mastHeight, 6), deckMaterial);
-	mast.position.set(mastX, 0.6 + mastHeight / 2, mastZ);
-	heel.add(mast);
+	const rudder = new Mesh(rudderGeometry(palette), solid);
+	rudder.position.set(0, 0, BOAT_LENGTH / 2);
+	heel.add(rudder);
 
-	// Mainsail pivots on the mast; its foot (the boom) runs aft along +Z.
+	const crew = new Mesh(crewGeometry(palette), solid);
+	crew.position.set(0, 0.92, 1.75);
+	heel.add(crew);
+
+	// Mainsail and boom pivot on the mast; the boom runs aft along +Z.
 	const mainPivot = new Group();
-	mainPivot.position.set(mastX, 1.3, mastZ);
+	mainPivot.position.set(0, RIG.boomY, RIG.mastZ);
 	heel.add(mainPivot);
-	const main = new Mesh(triangle([0, 0, 0], [0, mastHeight - 1, 0], [0, 0, 3.4]), sailMaterial);
-	mainPivot.add(main);
-	const boomMesh = new Mesh(new CylinderGeometry(0.06, 0.06, 3.5, 5), deckMaterial);
-	boomMesh.rotation.x = Math.PI / 2;
-	boomMesh.position.set(0, 0, 1.75);
-	mainPivot.add(boomMesh);
+	const main = new Mesh(mainsailGeometry(palette), cloth);
+	main.position.y = 0.08;
+	mainPivot.add(main, new Mesh(boomGeometry(palette), solid));
 
-	// Jib pivots on the forestay near the bow.
+	// The jib swings about the forestay, which leans aft from tack to hoist.
+	const stayRise = RIG.hoistY - RIG.tackY;
+	const stayRun = RIG.mastZ - RIG.tackZ;
+	const stayLean = Math.atan2(stayRun, stayRise);
+	const jibStay = new Group();
+	jibStay.position.set(0, RIG.tackY, RIG.tackZ);
+	jibStay.rotation.x = stayLean;
 	const jibPivot = new Group();
-	jibPivot.position.set(0, 1.1, -BOAT_LENGTH / 2 + 0.4);
-	heel.add(jibPivot);
-	const jib = new Mesh(triangle([0, 0, 0], [0, mastHeight - 2, 2.1], [0, 0, 2.1]), sailMaterial);
+	jibStay.add(jibPivot);
+	heel.add(jibStay);
+	// Clew 0.35 up and 2.25 aft of the tack, expressed in the stay's frame.
+	const clew = [
+		0.35 * Math.cos(stayLean) + 2.25 * Math.sin(stayLean),
+		-0.35 * Math.sin(stayLean) + 2.25 * Math.cos(stayLean),
+	] as const;
+	const jib = new Mesh(jibGeometry(palette, Math.hypot(stayRise, stayRun), clew), cloth);
 	jibPivot.add(jib);
 
-	const rudder = new Mesh(new CylinderGeometry(0.05, 0.05, 1.2, 4), deckMaterial);
-	rudder.position.set(0, 0.2, BOAT_LENGTH / 2);
-	heel.add(rudder);
+	const bowWave = new Mesh(bowWaveGeometry(palette.wake), foam);
+	frame.add(bowWave);
+
+	const shadow = new Mesh(shadowGeometry(palette.shadow), foam);
+	shadow.rotation.y = Math.atan2(SHADOW_X, SHADOW_Z);
+	shadow.renderOrder = -1;
+	group.add(shadow);
 
 	let rudderAngle = 0;
 	let heelAngle = 0;
 	let boomSwing = 0;
+	let jibSwing = 0;
+	let luff = 0;
+	let spray = 0;
 
 	return {
 		group,
 		update(pose, wind, steer, timeSec) {
-			group.position.set(pose.x, 0, -pose.y);
-			group.rotation.y = -pose.heading;
 			const twa = trueWindAngle(pose.heading, wind);
 			const side = sailSide(pose.heading, wind);
 			const power = Math.min(1, pose.speed / MAX_SPEED);
@@ -131,21 +135,48 @@ export function createBoatModel(palette: Palette): BoatModel {
 			// Ease the controls so the boat visibly reacts to every input.
 			rudderAngle += (steer * 0.5 - rudderAngle) * 0.2;
 			rudder.rotation.y = -rudderAngle;
-			const targetHeel = inIrons ? 0 : -side * power * 0.32 * Math.sin(Math.min(twa, Math.PI / 2));
+			const targetHeel = inIrons ? 0 : -side * power * 0.4 * Math.sin(Math.min(twa, Math.PI / 2));
 			heelAngle += (targetHeel - heelAngle) * 0.06;
 			const targetBoom = side * boomAngle(twa);
 			boomSwing += normalizeAngle(targetBoom - boomSwing) * 0.08;
-			const flutter = inIrons ? Math.sin(timeSec * 22) * 0.12 : 0;
+			// Dead downwind the jib goes out the other side: wing on wing.
+			const targetJib = twa > 2.55 ? -side * 1.05 : targetBoom * 0.85;
+			jibSwing += normalizeAngle(targetJib - jibSwing) * 0.07;
+			luff += ((inIrons ? 1 : 0) - luff) * 0.12;
+
+			// Ride the swell: bob and pitch, a touch livelier at speed.
+			const phase = timeSec * 1.15 + (pose.x - pose.y) * 0.06;
+			frame.position.set(pose.x, Math.sin(phase) * 0.1 - 0.03, -pose.y);
+			frame.rotation.y = -pose.heading;
 			heel.rotation.z = heelAngle + Math.sin(timeSec * 1.7) * 0.025;
-			heel.rotation.x = Math.sin(timeSec * 1.3 + 0.6) * 0.02 - power * 0.03;
-			mainPivot.rotation.y = boomSwing + flutter;
-			jibPivot.rotation.y = boomSwing * 0.7 + flutter * 1.4;
+			heel.rotation.x = Math.cos(phase) * 0.03 + Math.sin(timeSec * 3.3) * 0.012 * power - power * 0.035;
+
+			// Sails belly to leeward, swap sides as the boom crosses, and
+			// flutter flat when the boat is head to wind.
+			const flutter = Math.sin(timeSec * 21) * luff;
+			const fill = Math.max(-1, Math.min(1, boomSwing / 0.1)) * (1 - luff * 0.8);
+			mainPivot.rotation.y = boomSwing + flutter * 0.1;
+			jibPivot.rotation.y = jibSwing + flutter * 0.16;
+			main.scale.x = sailFill(fill + flutter * 0.45);
+			const jibFill = Math.max(-1, Math.min(1, jibSwing / 0.1)) * (1 - luff * 0.8);
+			jib.scale.x = sailFill(jibFill + Math.sin(timeSec * 26 + 1) * luff * 0.55);
+			// The helmsman sits up to windward, opposite the boom.
+			crew.position.x = -Math.max(-1, Math.min(1, boomSwing / 0.3)) * 0.5;
+
+			spray += (Math.max(0, power - 0.25) / 0.75 - spray) * 0.1;
+			bowWave.visible = spray > 0.03;
+			const surge = 1 + 0.12 * Math.sin(timeSec * 13) + 0.08 * Math.sin(timeSec * 7.3);
+			bowWave.scale.set(1, spray * 1.5 * surge, 0.6 + 0.5 * spray);
+			bowWave.position.z = -(BOAT_LENGTH / 2) * (1 - (0.6 + 0.5 * spray));
+
+			shadow.position.set(pose.x + SHADOW_X * SHADOW_REACH, 0.02, -pose.y + SHADOW_Z * SHADOW_REACH);
+			shadow.scale.set(2.7, 1, 6.2);
 		},
 		dispose() {
 			group.traverse((node) => {
 				if (node instanceof Mesh) node.geometry.dispose();
 			});
-			for (const m of [hullMaterial, deckMaterial, sailMaterial, accentMaterial]) m.dispose();
+			for (const material of [solid, cloth, foam]) material.dispose();
 		},
 	};
 }

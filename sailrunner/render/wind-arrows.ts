@@ -34,7 +34,7 @@ export class WindArrows {
 		geometry.rotateX(-Math.PI / 2);
 		this.mesh = new InstancedMesh(
 			geometry,
-			new MeshBasicMaterial({ color: palette.fleck, transparent: true, opacity: 0.5, depthWrite: false }),
+			new MeshBasicMaterial({ color: palette.fleck, transparent: true, opacity: 0.62, depthWrite: false }),
 			PER_SIDE * PER_SIDE,
 		);
 		// Instances move far from the mesh origin; a stale bounding sphere would cull them.

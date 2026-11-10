@@ -2,11 +2,23 @@ import { Color } from "three";
 
 /** World colours, read from CSS tokens so dark mode dims the same hues. */
 export interface Palette {
+	/** Sky at the horizon; also the haze the far water fades into. */
 	sky: Color;
+	skyTop: Color;
+	sun: Color;
+	cloud: Color;
+	island: Color;
+	lightKey: Color;
+	lightFill: Color;
 	sea: Color;
+	seaDeep: Color;
+	shadow: Color;
 	fleck: Color;
 	hull: Color;
 	deck: Color;
+	plank: Color;
+	glass: Color;
+	crew: Color;
 	sail: Color;
 	accent: Color;
 	buoy: Color;
@@ -18,10 +30,21 @@ export interface Palette {
 
 const TOKENS: Record<keyof Palette, string> = {
 	sky: "--world-sky",
+	skyTop: "--world-sky-top",
+	sun: "--world-sun",
+	cloud: "--world-cloud",
+	island: "--world-island",
+	lightKey: "--world-light-key",
+	lightFill: "--world-light-fill",
 	sea: "--world-sea",
+	seaDeep: "--world-sea-deep",
+	shadow: "--world-shadow",
 	fleck: "--world-fleck",
 	hull: "--world-hull",
 	deck: "--world-deck",
+	plank: "--world-plank",
+	glass: "--world-glass",
+	crew: "--world-crew",
 	sail: "--world-sail",
 	accent: "--world-accent",
 	buoy: "--world-buoy",
