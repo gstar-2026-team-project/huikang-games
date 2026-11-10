@@ -1,4 +1,4 @@
-import { BEST_GLIDE_SPEED, MAX_SPEED, STALL_SPEED } from "../game/constants";
+import { BEST_GLIDE_SPEED, CRASH_DURATION, MAX_SPEED, STALL_SPEED } from "../game/constants";
 import { forward, type Sim } from "../game/flight";
 import { surfaceHeight } from "../game/terrain";
 
@@ -8,6 +8,11 @@ const CHASE_BACK = 28;
 const CHASE_UP = 3.6;
 /** Share of the glider's pitch the camera follows: the horizon bobs less than the nose. */
 const CAMERA_PITCH = 0.6;
+/** After touching the ground the camera rises and backs away to show where the flight ended. */
+const CRASH_PULL_BACK = 170;
+const CRASH_RISE = 60;
+/** Height the pulled-back camera keeps above the ground under it, so it never ends inside a hill. */
+const CRASH_CLEAR = 45;
 
 /** Chase camera behind the plane, and the projection onto the screen. */
 export class Camera {
@@ -46,12 +51,26 @@ export class Camera {
 		this.x = p.x - f[0] * CHASE_BACK + ux * CHASE_UP;
 		this.y = p.y - f[1] * CHASE_BACK + uy * CHASE_UP;
 		this.z = p.z - f[2] * CHASE_BACK + uz * CHASE_UP;
-		const gh = surfaceHeight(sim.terrain, this.x, this.z) + 2;
+		// Landed out: ease from the chase view to a high view looking down on the spot.
+		const k = sim.endReason === "ground" ? Math.min(1, sim.crashT / CRASH_DURATION) : 0;
+		const out = k * k * (3 - 2 * k);
+		if (out > 0) {
+			const hx = Math.sin(p.yaw), hz = Math.cos(p.yaw);
+			this.x += (p.x - hx * CRASH_PULL_BACK - this.x) * out;
+			this.y += (p.y + CRASH_RISE - this.y) * out;
+			this.z += (p.z - hz * CRASH_PULL_BACK - this.z) * out;
+		}
+		const gh = surfaceHeight(sim.terrain, this.x, this.z) + 2 + (CRASH_CLEAR - 2) * out;
 		if (this.y < gh) this.y = gh;
 		this.cYaw = Math.cos(p.yaw); this.sYaw = Math.sin(p.yaw);
-		const pitch = Math.max(-0.35, Math.min(0.3, p.pitch * CAMERA_PITCH));
+		const chase = Math.max(-0.35, Math.min(0.3, p.pitch * CAMERA_PITCH));
+		// Pulled back, the camera tips halfway toward where the glider came down: the spot
+		// sits below the result panel and the horizon stays in view above it.
+		const lookDown = -0.5 * Math.atan2(this.y - p.y, Math.hypot(p.x - this.x, p.z - this.z) || 1);
+		const pitch = chase + (lookDown - chase) * out;
 		this.cp = Math.cos(pitch); this.sp = Math.sin(pitch);
-		this.cr = Math.cos(sim.camRoll); this.sr = Math.sin(sim.camRoll);
+		const roll = sim.camRoll * (1 - out);
+		this.cr = Math.cos(roll); this.sr = Math.sin(roll);
 		this.dir(Math.cos(p.yaw), 0, -Math.sin(p.yaw), right);
 		this.screenRoll = Math.atan2(-(right[1] ?? 0), right[0] ?? 1);
 	}

@@ -73,14 +73,12 @@ test("capture profile picture", async ({ page }) => {
 	const frame = await waitForBlobFrame(page);
 	await frame.locator("[data-testid=mode-daily]").click();
 	await frame.locator('#root[data-screen="play"]').waitFor({ state: "attached", timeout: 15_000 });
-	// The picture is the world, not the instruments: the glider, the rings of
-	// the opening thermal ahead, the first beacon and the clouds beyond.
-	await frame.addStyleTag({ content: "#hud, #map, #controls, #rival, #warn, #toast { display: none !important; }" });
-	// Bank into the turn for a moment so the long wings read, then capture in flight.
-	await frame.waitForFunction(() => (window.__cloudrunnerProbe?.().elapsed ?? 0) > 1.2);
-	await page.keyboard.down("ArrowLeft");
-	await frame.waitForFunction(() => (window.__cloudrunnerProbe?.().elapsed ?? 0) > 2.1);
-	await page.keyboard.up("ArrowLeft");
+	// The picture is the world, not the instruments: the glider heading for
+	// the first beacon, with the opening thermal's cloud and column beyond.
+	await frame.addStyleTag({
+		content: "#hud, #map, #controls, #rival, #warn, #toast, #vario, #hint { display: none !important; }",
+	});
+	// Straight ahead keeps the first beacon in view, so no off-screen arrow is drawn.
 	await frame.waitForFunction(() => (window.__cloudrunnerProbe?.().elapsed ?? 0) > 2.5);
 	await page.screenshot({ path: SCREENSHOT_PATH, fullPage: false });
 });
