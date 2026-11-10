@@ -16,6 +16,7 @@ import type { Course, Point } from "../game/course";
 import { normalizeAngle } from "../game/physics";
 import { BOAT_LENGTH, type BoatModel, type BoatPose, createBoatModel } from "./boat";
 import { type Palette, readPalette } from "./palette";
+import { WindArrows } from "./wind-arrows";
 import { addToScene, GuidePath, Marks, Sea } from "./world";
 
 /** Chase camera offset behind and above the boat, in world units. */
@@ -46,6 +47,7 @@ export class SailingScene {
 	private sea: Sea;
 	private marks: Marks;
 	private guide: GuidePath;
+	private windArrows: WindArrows;
 	private sun = new DirectionalLight(0xffffff, 1.6);
 	private hemi = new HemisphereLight(0xffffff, 0x335566, 1.4);
 	private cameraHeading = 0;
@@ -62,8 +64,18 @@ export class SailingScene {
 		this.sea = new Sea(palette);
 		this.marks = new Marks(palette);
 		this.guide = new GuidePath(palette);
+		this.windArrows = new WindArrows(palette);
 		this.sun.position.set(-40, 80, 30);
-		addToScene(this.scene, this.sea.root, this.marks.root, this.guide.mesh, this.boat.group, this.sun, this.hemi);
+		addToScene(
+			this.scene,
+			this.sea.root,
+			this.windArrows.mesh,
+			this.marks.root,
+			this.guide.mesh,
+			this.boat.group,
+			this.sun,
+			this.hemi,
+		);
 		this.applyPalette(palette);
 	}
 
@@ -79,6 +91,7 @@ export class SailingScene {
 		this.sea.setPalette(palette);
 		this.marks.setPalette(palette);
 		this.guide.setPalette(palette);
+		this.windArrows.setPalette(palette);
 	}
 
 	setCourse(course: Course): void {
@@ -122,6 +135,7 @@ export class SailingScene {
 		this.stern.z = bz + Math.cos(pose.heading) * (BOAT_LENGTH / 2);
 		if (frame.snapCamera) this.sea.resetWake();
 		this.sea.update(bx, bz, frame.wind, frame.timeSec, moving ? this.stern : undefined);
+		this.windArrows.update(bx, bz, frame.wind, frame.timeSec);
 		this.renderer.render(this.scene, this.camera);
 	}
 
@@ -130,6 +144,7 @@ export class SailingScene {
 		this.sea.dispose();
 		this.marks.dispose();
 		this.guide.dispose();
+		this.windArrows.dispose();
 		this.renderer.dispose();
 	}
 }

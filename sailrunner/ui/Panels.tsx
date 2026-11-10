@@ -131,7 +131,8 @@ export function HelpSheet({ onClose }: { onClose(): void }) {
 					<li>Hold the ◀ ▶ pads (or the arrow keys) to steer. The sails trim themselves.</li>
 					<li>
 						You can't sail within about 40° of the wind. To reach an upwind buoy, zig-zag (tack) across
-						the wind. The arrow by the speed gauge shows where the wind is blowing.
+						the wind. The arrows drifting across the water point the way the wind is blowing, and so does
+						the arrow by the speed gauge.
 					</li>
 					<li>Tap 🧭 to draw a suggested path through the buoys on the water and the map.</li>
 					<li>
