@@ -53,12 +53,17 @@ export function drawSky(ctx: CanvasRenderingContext2D, cam: Camera, sim: Sim, pa
 		ny = -ny;
 	}
 	// The baked gradient, stretched from the horizon up past the top of the screen.
-	const span = Math.max(cam.H * 1.1, cam.F * 0.9);
+	// (A negative height would not flip it: canvas normalises the rectangle, which
+	// put the gradient under the ground and left the sky one flat colour.)
+	// Short enough that the deeper blue reaches the top of the screen behind the clouds.
+	const span = Math.max(cam.H * 0.75, cam.F * 0.6);
 	const ratio = ctx.getTransform().a;
 	ctx.save();
-	ctx.setTransform(ux * ratio, uy * ratio, -nx * ratio, -ny * ratio, ax * ratio, ay * ratio);
+	// Local x runs along the horizon and local y points down, so the strip's top
+	// (the zenith colour) lands `span` above the horizon and its bottom on it.
+	ctx.setTransform(ux * ratio, uy * ratio, nx * ratio, ny * ratio, ax * ratio, ay * ratio);
 	ctx.imageSmoothingEnabled = true;
-	ctx.drawImage(skySprite(pal), -E, 0, 2 * E, -span);
+	ctx.drawImage(skySprite(pal), -E, -span, 2 * E, span);
 	ctx.restore();
 
 	drawSun(ctx, cam, pal);
