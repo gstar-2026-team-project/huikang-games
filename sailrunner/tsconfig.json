@@ -10,5 +10,5 @@
 		"allowImportingTsExtensions": true,
 		"types": ["bun-types", "vite/client"]
 	},
-	"include": ["tile/src", "synced-store", "game", "render", "ui", "tests", "client.ts"]
+	"include": ["tile/src", "web/src", "synced-store", "game", "render", "ui", "tests", "client.ts"]
 }

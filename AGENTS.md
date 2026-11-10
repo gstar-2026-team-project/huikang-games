@@ -12,6 +12,9 @@ dependencies, tests, and `.poe-tile.json`.
 - Keep game code inside its folder. Do not add a root `package.json` or
   shared code unless the user asks for it.
 - When adding a game, add a row for it to the table in `README.md`.
+- A game's folder name can differ from its tile handle in `.poe-tile.json`
+  (`sailrunner/` is the tile `sailing-regatta-q7m3`). Renaming a folder must
+  not change the handle, or publishing creates a different tile.
 
 ## Committing
 
@@ -31,3 +34,13 @@ dependencies, tests, and `.poe-tile.json`.
   URL and the receipt (live status, discovery, source visibility).
 - Keep a tile's discovery as it is (new tiles are unlisted). Listing a tile
   publicly is still the user's call.
+
+## GitHub Pages
+
+- Every push to `main` runs `.github/workflows/pages.yml`, which builds each
+  game's standalone web version (`bun run build:web`, output in `dist-web/`)
+  and deploys it to <https://gstar-2026-team-project.github.io/huikang-games/>.
+- The web version has no Joiner host: `web/src/local-store.ts` replaces the
+  synced store with localStorage. When a change adds a mutator or a host
+  capability the UI calls, mirror it there, or the web build breaks.
+- After pushing, check that the workflow run succeeded and the page loads.

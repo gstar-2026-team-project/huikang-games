@@ -2,6 +2,7 @@ node_modules/
 
 # Build output
 dist/
+dist-web/
 
 # Local CLI credential filenames. The CLI normally reads them from ~/.poe-tiles/.
 .poe-tiles-token
