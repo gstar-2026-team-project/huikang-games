@@ -292,12 +292,14 @@ export class RaceController {
 		this.raf = requestAnimationFrame(this.loop);
 		const dt = Math.min(MAX_FRAME_DT, Math.max(0, (now - (this.lastNow || now)) / 1000));
 		this.lastNow = now;
-		this.wallSec += dt;
 		const course = this.course;
 		if (!course) return;
 		this.advance(course, dt);
 
 		const active = this.steering() || this.mode === "replay" || now < this.awakeUntil;
+		// Animation time only runs while frames come at full rate. On idle screens the
+		// occasional ambient frame then repeats a still scene instead of a 4 fps stutter.
+		if (active) this.wallSec += dt;
 		if (!active) {
 			if (now - this.lastIdleRender < IDLE_FRAME_MS) {
 				this.scene.budget.shouldRenderFrame(now, { idle: true });
@@ -306,7 +308,7 @@ export class RaceController {
 			this.lastIdleRender = now;
 		}
 		if (!this.scene.budget.shouldRenderFrame(now)) return;
-		this.scene.budget.renderFrame(() => this.draw(course, dt));
+		this.scene.budget.renderFrame(() => this.draw(course, active ? dt : 0));
 	};
 
 	private advance(course: Course, dt: number): void {

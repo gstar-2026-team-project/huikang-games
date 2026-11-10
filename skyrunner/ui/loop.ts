@@ -7,7 +7,7 @@ const WAKE_MS = 1000; // full rate this long after input or a phase change
 export interface LoopHooks {
 	/** One fixed simulation step. */
 	step(dt: number): void;
-	/** Draw the current state; `dt` is the real time since the last draw. */
+	/** Draw the current state; `dt` is the animation time since the last draw (0 on still frames), `nowMs` the animation clock. */
 	render(dt: number, nowMs: number): void;
 	/** True on menus, pause and game-over screens. */
 	isIdle(): boolean;
@@ -21,6 +21,12 @@ export class Loop {
 	private lastRender = 0;
 	private wakeUntil = 0;
 	private running = false;
+	/**
+	 * Animation clock (ms): runs only while frames come at full rate, so the
+	 * occasional ambient frame on an idle screen repeats a still scene instead
+	 * of animating at 4 fps, which reads as lag.
+	 */
+	private animMs = 0;
 	onError: (err: unknown) => void = () => undefined;
 
 	constructor(
@@ -62,13 +68,15 @@ export class Loop {
 				}
 			} else this.acc = 0;
 			const awake = !idle || now < this.wakeUntil;
+			if (awake) this.animMs += dt * 1000;
 			const ambientDue = now - this.lastRender >= AMBIENT_MS;
 			if (!awake && !ambientDue) {
 				this.budget?.shouldRenderFrame(now, { idle: true });
 			} else if (!this.budget || this.budget.shouldRenderFrame(now)) {
-				const rdt = this.lastRender ? Math.min(MAX_FRAME_TIME, (now - this.lastRender) / 1000) : 0;
+				const rdt = awake && this.lastRender ? Math.min(MAX_FRAME_TIME, (now - this.lastRender) / 1000) : 0;
 				this.lastRender = now;
-				const draw = () => this.hooks.render(rdt, now);
+				const anim = this.animMs;
+				const draw = () => this.hooks.render(rdt, anim);
 				if (this.budget) this.budget.renderFrame(draw);
 				else draw();
 			}
