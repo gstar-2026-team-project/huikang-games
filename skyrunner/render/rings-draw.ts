@@ -177,6 +177,11 @@ function strokeRing(ctx: CanvasRenderingContext2D, cam: Camera, r: Ring, rad: nu
 	}
 }
 
+/** Inset of the off-screen ring arrow from the sides and top of the view (px), and its lowest point as a share of the height. */
+const ARROW_MARGIN = 36;
+const ARROW_TOP = 84;
+const ARROW_BOTTOM = 0.6;
+
 /** Edge arrow toward the next ring when it is off screen. */
 export function drawRingArrow(ctx: CanvasRenderingContext2D, cam: Camera, sim: Sim, pal: Palette): void {
 	const r = sim.rings[sim.next];
@@ -187,9 +192,26 @@ export function drawRingArrow(ctx: CanvasRenderingContext2D, cam: Camera, sim: S
 		if (X > 30 && X < cam.W - 30 && Y > 80 && Y < cam.H - 30) return;
 	}
 	const ang = Math.atan2(-(tmp[1] ?? 0), tmp[0] ?? 0);
-	const R = Math.min(cam.W, cam.H) * 0.32;
+	// Pin the arrow to the edge of the view along that direction, inside a box
+	// that keeps it below the HUD and above the plane and the controls.
+	const cx = cam.W / 2, cy = cam.horizonY;
+	const dx = Math.cos(ang), dy = Math.sin(ang);
+	const left = ARROW_MARGIN, right = cam.W - ARROW_MARGIN;
+	const top = ARROW_TOP, bottom = Math.max(top + 40, cam.H * ARROW_BOTTOM);
+	let t = Number.POSITIVE_INFINITY;
+	if (dx > 1e-6) t = Math.min(t, (right - cx) / dx);
+	if (dx < -1e-6) t = Math.min(t, (left - cx) / dx);
+	if (dy > 1e-6) t = Math.min(t, (bottom - cy) / dy);
+	if (dy < -1e-6) t = Math.min(t, (top - cy) / dy);
+	let x = cx + dx * t, y = cy + dy * t;
+	// A ring below the plane would put the arrow on the plane itself: show it at
+	// the nearer side edge instead, still pointing down toward it.
+	if (dy > 0.3) {
+		x = dx >= 0 ? right : left;
+		y = bottom;
+	}
 	ctx.save();
-	ctx.translate(cam.W / 2 + Math.cos(ang) * R, cam.horizonY + Math.sin(ang) * R);
+	ctx.translate(x, y);
 	ctx.rotate(ang);
 	ctx.fillStyle = r.target ? rgba(pal.ringTargetRgb, 1) : pal.ring;
 	ctx.strokeStyle = rgba(r.target ? pal.ringTargetRim : pal.ringRim, 0.9);
