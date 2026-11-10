@@ -1,0 +1,13 @@
+{
+	"compilerOptions": {
+		"target": "ESNext",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"strict": true,
+		"skipLibCheck": true,
+		"noEmit": true,
+		"allowImportingTsExtensions": true,
+		"types": ["bun-types", "vite/client"]
+	},
+	"include": ["tile/src", "web/src", "synced-store", "ui", "tests", "client.ts"]
+}

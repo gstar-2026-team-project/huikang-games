@@ -10,14 +10,15 @@ Play them in the browser at
 | Folder | Game | Play on the web |
 | --- | --- | --- |
 | [`sailrunner/`](sailrunner/) | **Sailrunner**: race a sailboat around a new buoy course every day, with a sailing lesson, a shared leaderboard, and replays. | [sailrunner/](https://gstar-2026-team-project.github.io/huikang-games/sailrunner/) |
+| [`skyrunner/`](skyrunner/) | **Skyrunner**: fly a plane through golden rings, with a daily challenge, twelve star-rated canyon levels, and endless free flight. | [skyrunner/](https://gstar-2026-team-project.github.io/huikang-games/skyrunner/) |
 
 The web versions run without Joiner, so they are single-player: times and
-replays are saved in the browser only, with no shared leaderboard.
+progress are saved in the browser only, with no shared leaderboard.
 
 ## Working on a game
 
 ```bash
-cd sailrunner
+cd sailrunner       # or skyrunner
 bun install
 bun run dev        # live preview inside a local Joiner host
 bun run build:web  # standalone web build in dist-web/
@@ -37,5 +38,5 @@ poe-tiles tiles init my-game-x7k2 --template react
 ```
 
 Then add it to the table above. To put it on GitHub Pages too, give it a
-standalone `build:web` like Sailrunner's (`sailrunner/web/`), and add it to the
+standalone `build:web` like the others (`sailrunner/web/`, `skyrunner/web/`), and add it to the
 workflow and to `.github/pages/index.html`.

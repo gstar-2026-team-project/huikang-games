@@ -12,6 +12,10 @@ dependencies, tests, and `.poe-tile.json`.
 - Keep game code inside its folder. Do not add a root `package.json` or
   shared code unless the user asks for it.
 - When adding a game, add a row for it to the table in `README.md`.
+- Look up a tile with its creator prefix: `poe-tiles tiles get huikang/<handle>`.
+  A bare handle returns "Tile not found" even for your own tile, and
+  `tiles list` shows only listed tiles; `poe-tiles tiles power` lists the
+  tiles this account owns.
 - A game's folder name can differ from its tile handle in `.poe-tile.json`
   (`sailrunner/` is the tile `sailing-regatta-q7m3`). Renaming a folder must
   not change the handle, or publishing creates a different tile.

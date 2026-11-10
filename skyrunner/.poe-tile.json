@@ -1,0 +1,23 @@
+{
+	"$schema": "https://poe-tiles-docs.pages.dev/schemas/poe-tile/v10.json",
+	"handle": "skyrunner",
+	"displayName": "Skyrunner",
+	"shortDescription": "Thread golden rings: a daily challenge course, twelve star-rated canyon runs in a fighter jet, and endless free flight.",
+	"longDescription": "./README.md",
+	"players": {
+		"min": 1
+	},
+	"instancing": "per-context",
+	"runtimeBundle": {
+		"dir": "dist"
+	},
+	"sourceBundle": {
+		"dir": ".",
+		"visibility": "public"
+	},
+	"profilePicture": "./assets/icon.webp",
+	"screenshots": [
+		"./assets/gallery/1-canyon.png",
+		"./assets/gallery/2-valley.png"
+	]
+}

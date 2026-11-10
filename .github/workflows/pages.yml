@@ -36,11 +36,19 @@ jobs:
           bun run type-check
           bun run test
           bun run build:web
+      - name: Build Skyrunner
+        working-directory: skyrunner
+        run: |
+          bun install --frozen-lockfile --ignore-scripts
+          bun run type-check
+          bun run test
+          bun run build:web
       - name: Assemble site
         run: |
           mkdir -p _site
           cp .github/pages/index.html _site/index.html
           cp -r sailrunner/dist-web _site/sailrunner
+          cp -r skyrunner/dist-web _site/skyrunner
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
