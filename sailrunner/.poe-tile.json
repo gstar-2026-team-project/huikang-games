@@ -1,10 +1,10 @@
 {
 	"$schema": "https://poe-tiles-docs.pages.dev/schemas/poe-tile/v10.json",
-	"handle": "sailing-regatta-q7m3",
+	"handle": "sailrunner",
 	"displayName": "Sailrunner",
 	"shortDescription": "Race a sailboat around a new buoy course every day: read the wind, tack upwind, and beat your friends' times, then watch their replays.",
 	"longDescription": "./README.md",
-	"profilePicture": "./assets/screenshot.png",
+	"profilePicture": "./assets/icon.webp",
 	"instancing": "per-context",
 	"players": {
 		"min": 1

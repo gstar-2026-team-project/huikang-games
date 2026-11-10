@@ -18,7 +18,7 @@
 		"preinstall": "bun scripts/check-bun.ts"
 	},
 	"dependencies": {
-		"poe-tiles-sdk": "https://misc-dev-uploads.quora-913.workers.dev/e42fd6bd7feb70b37287c45a6e7573972532d08012c4630f9246862b0f0541c5",
+		"poe-tiles-sdk": "https://misc-dev-uploads.quora-913.workers.dev/964437e492ddbddb32310acbbb15ca5f5097ac05c85b940bff48278612ebfe1b",
 		"three": "0.170.0"
 	},
 	"devDependencies": {
