@@ -3,6 +3,8 @@ import type { ShellRefs } from "./shell";
 
 const DEADZONE = 0.06;
 const STICK_TRAVEL = 0.38; // fraction of the zone the knob travels
+/** Bank from an arrow key: about half stick, the turn that keeps a glider circling in a thermal. */
+const KEY_BANK = 0.5;
 
 /** Touch stick and keyboard, folded into one Controls value. */
 export class FlightInput {
@@ -79,8 +81,10 @@ export class FlightInput {
 		let roll = this.stick.x;
 		let pitch = this.stick.y;
 		const k = this.keys;
-		if (k.has("ArrowLeft") || k.has("a")) roll = -1;
-		if (k.has("ArrowRight") || k.has("d")) roll = 1;
+		// Keys give the half bank that holds a thermal; Shift tightens it to full bank.
+		const keyBank = k.has("Shift") ? 1 : KEY_BANK;
+		if (k.has("ArrowLeft") || k.has("a")) roll = -keyBank;
+		if (k.has("ArrowRight") || k.has("d")) roll = keyBank;
 		if (k.has("ArrowUp") || k.has("w")) pitch = 1;
 		if (k.has("ArrowDown") || k.has("s")) pitch = -1;
 		if (this.invert) pitch = -pitch;
