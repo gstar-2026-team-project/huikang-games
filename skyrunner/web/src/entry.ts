@@ -9,6 +9,7 @@ import "../../tile/styles.css";
 import { mountApp } from "../../ui/App";
 import type { AppProps } from "../../ui/app-contract";
 import { LocalStore, type StorageLike } from "./local-store";
+import { mountSizedFrame } from "./screen-size";
 
 function browserStorage(): StorageLike | null {
 	try {
@@ -19,36 +20,41 @@ function browserStorage(): StorageLike | null {
 	}
 }
 
-const noop = () => undefined;
-const isForeground = () => document.visibilityState === "visible";
+function mountGame(root: HTMLElement): void {
+	const noop = () => undefined;
+	const isForeground = () => document.visibilityState === "visible";
 
-// Only the host capabilities the UI calls; there is no Joiner host here.
-const poe = {
-	haptics: { impact: noop, notification: noop, selection: noop },
-	room: {
-		// The in-game end panel already shows the result and "Fly again".
-		tileEnd: async () => ({ outcome: "dismissed", playAgain: false }),
-		openInvitePicker: async () => undefined,
-	},
-	users: { openProfile: async () => undefined },
-} as unknown as PoeAPI;
+	// Only the host capabilities the UI calls; there is no Joiner host here.
+	const poe = {
+		haptics: { impact: noop, notification: noop, selection: noop },
+		room: {
+			// The in-game end panel already shows the result and "Fly again".
+			tileEnd: async () => ({ outcome: "dismissed", playAgain: false }),
+			openInvitePicker: async () => undefined,
+		},
+		users: { openProfile: async () => undefined },
+	} as unknown as PoeAPI;
 
-const appProps: AppProps = {
-	store: new LocalStore(browserStorage()).client(),
-	poe,
-	resumeAudioContext,
-	suppressLongPressMagnifier,
-	createRenderBudget: null,
-	isPoeTileForeground: isForeground,
-	subscribePoeTileForegroundState: (listener) => {
-		const onChange = () => {
-			const visible = isForeground();
-			listener(visible, { reason: visible ? "visible" : "backgrounded" });
-		};
-		document.addEventListener("visibilitychange", onChange);
-		return () => document.removeEventListener("visibilitychange", onChange);
-	},
-};
+	const appProps: AppProps = {
+		store: new LocalStore(browserStorage()).client(),
+		poe,
+		resumeAudioContext,
+		suppressLongPressMagnifier,
+		createRenderBudget: null,
+		isPoeTileForeground: isForeground,
+		subscribePoeTileForegroundState: (listener) => {
+			const onChange = () => {
+				const visible = isForeground();
+				listener(visible, { reason: visible ? "visible" : "backgrounded" });
+			};
+			document.addEventListener("visibilitychange", onChange);
+			return () => document.removeEventListener("visibilitychange", onChange);
+		},
+	};
+
+	mountApp(root, appProps);
+}
 
 const root = document.getElementById("root");
-if (root) mountApp(root, appProps);
+// `?display=mobile` or `?display=768x768` runs the game in a frame of that size instead.
+if (root && !mountSizedFrame("Skyrunner")) mountGame(root);

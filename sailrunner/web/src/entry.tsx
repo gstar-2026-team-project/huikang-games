@@ -6,6 +6,7 @@
 import { createRoot } from "react-dom/client";
 import "../../tile/styles.css";
 import { LocalStore, type StorageLike } from "./local-store";
+import { mountSizedFrame } from "./screen-size";
 import { WebApp } from "./WebApp";
 
 function browserStorage(): StorageLike | null {
@@ -18,6 +19,7 @@ function browserStorage(): StorageLike | null {
 }
 
 const root = document.getElementById("root");
-if (root) {
+// `?display=mobile` or `?display=768x768` runs the game in a frame of that size instead.
+if (root && !mountSizedFrame("Sailrunner")) {
 	createRoot(root).render(<WebApp local={new LocalStore(browserStorage())} />);
 }

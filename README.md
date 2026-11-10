@@ -15,6 +15,11 @@ Play them in the browser at
 The web versions run without Joiner, so they are single-player: times and
 progress are saved in the browser only, with no shared leaderboard.
 
+Add `?display=` to any of these pages to play at a fixed screen size, centred
+in the window: a name (`?display=mobile` is 390x844, `tablet` is 768x1024,
+`desktop` is 1280x800) or an exact size in CSS pixels (`?display=768x768`).
+The landing page passes it on to the game you open.
+
 ## Working on a game
 
 ```bash

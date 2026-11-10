@@ -47,4 +47,7 @@ dependencies, tests, and `.poe-tile.json`.
 - The web version has no Joiner host: `web/src/local-store.ts` replaces the
   synced store with localStorage. When a change adds a mutator or a host
   capability the UI calls, mirror it there, or the web build breaks.
+- Every web page takes `?display=mobile` or `?display=768x768` to run at a
+  fixed screen size (`web/src/screen-size.ts`, one copy per game); a new
+  game's web entry should call `mountSizedFrame` too.
 - After pushing, check that the workflow run succeeded and the page loads.

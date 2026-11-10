@@ -78,4 +78,21 @@ test.describe("standalone web build", () => {
 		await expect.poll(() => page.evaluate(() => window.__regattaProbe?.().mode)).toBe("replay");
 		expect(errors).toEqual([]);
 	});
+
+	test("the display query parameter runs the game at that screen size", async ({ page }) => {
+		await page.setViewportSize({ width: 1200, height: 1000 });
+		for (const [display, width, height] of [["mobile", 390, 844], ["768x768", 768, 768]] as const) {
+			await page.goto(`${url}?display=${display}`);
+			const sized = page.locator("[data-testid=sized-frame]");
+			await expect(sized).toBeVisible();
+			const box = await sized.boundingBox();
+			expect([box?.width, box?.height]).toEqual([width, height]);
+			// Centred in the window, with the game seeing a viewport of that size.
+			expect(box?.x).toBe((1200 - width) / 2);
+			const game = page.frameLocator("[data-testid=sized-frame]");
+			await expect(game.locator('[data-testid="start-race"]')).toBeVisible({ timeout: 15_000 });
+			const inner = page.frames().find((frame) => frame !== page.mainFrame());
+			expect(await inner?.evaluate(() => [window.innerWidth, window.innerHeight])).toEqual([width, height]);
+		}
+	});
 });

@@ -45,5 +45,14 @@
 			</a>
 		</li>
 	</ul>
+	<script>
+		// Carry `?display=mobile` or `?display=768x768` through to the games.
+		const display = new URLSearchParams(location.search).get("display");
+		if (display) {
+			for (const link of document.querySelectorAll("li a")) {
+				link.href += `?display=${encodeURIComponent(display)}`;
+			}
+		}
+	</script>
 </body>
 </html>
