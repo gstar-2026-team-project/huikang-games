@@ -89,6 +89,16 @@ gameplay or visuals, play the web build in a browser and look at screenshots:
    screen for overlap or clipping.
 4. Delete the throwaway script.
 
+**Check motion frame by frame, never from loose screenshots.** Install
+Playwright's fake clock (`page.clock.install()` before `goto`), then advance it
+with `page.clock.runFor(100)` between screenshots: every frame is then exactly
+100 ms of game time apart. Freeze the variable you are not testing (for the
+wind arrows: stop the boat in irons first, so any motion on screen is the
+arrows' own). Stitch frames and an overlay of the first (red) and last (cyan)
+frame into one image, so each moving thing leaves a red-to-cyan streak you can
+read. `scripts/frames-example.test.playwright.ts` is a worked example: copy it
+into the game's `tests/`, serve `dist-web/`, run it, then delete the copy.
+
 `?display=mobile` or `?display=768x768` on any Pages URL runs the game at a
 fixed size, which is the quickest way for the user to check a layout.
 
