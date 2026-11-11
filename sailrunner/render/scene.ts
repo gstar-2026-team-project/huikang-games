@@ -21,6 +21,7 @@ import { type Palette, readPalette } from "./palette";
 import { Islands, Sky } from "./sky";
 import { Wake } from "./wake";
 import { FOG_FAR, FOG_NEAR, Sea, SUN_DIRECTION } from "./water";
+import { WindArrows } from "./wind-arrows";
 import { addToScene, GuidePath } from "./world";
 
 /** Chase camera offset behind and above the boat, in world units. */
@@ -56,6 +57,7 @@ export class SailingScene {
 	private wake: Wake;
 	private marks: Marks;
 	private guide: GuidePath;
+	private windArrows: WindArrows;
 	/** Warm key light from the sun, cool fill from the sky and the sea below. */
 	private sun = new DirectionalLight(0xffffff, 1.7);
 	private hemi = new HemisphereLight(0xffffff, 0x335566, 2);
@@ -76,6 +78,7 @@ export class SailingScene {
 		this.wake = new Wake(palette);
 		this.marks = new Marks(palette);
 		this.guide = new GuidePath(palette);
+		this.windArrows = new WindArrows(palette);
 		this.sun.position.copy(SUN_DIRECTION).multiplyScalar(100);
 		addToScene(
 			this.scene,
@@ -85,6 +88,7 @@ export class SailingScene {
 			this.wake.mesh,
 			this.marks.root,
 			this.guide.mesh,
+			this.windArrows.mesh,
 			this.boat.group,
 			this.sun,
 			this.hemi,
@@ -116,6 +120,7 @@ export class SailingScene {
 		this.scene.add(this.boat.group);
 		this.marks.setPalette(palette);
 		this.guide.setPalette(palette);
+		this.windArrows.setPalette(palette);
 	}
 
 	setCourse(course: Course): void {
@@ -163,6 +168,7 @@ export class SailingScene {
 		if (frame.snapCamera) this.wake.reset();
 		this.wake.update(frame.timeSec, pose.heading, pose.speed / MAX_SPEED, moving ? this.stern : undefined);
 		this.sky.update(this.camera.position.x, this.camera.position.z, frame.timeSec);
+		this.windArrows.update(bx, bz, frame.wind, frame.timeSec);
 		this.renderer.render(this.scene, this.camera);
 	}
 
@@ -174,6 +180,7 @@ export class SailingScene {
 		this.wake.dispose();
 		this.marks.dispose();
 		this.guide.dispose();
+		this.windArrows.dispose();
 		this.renderer.dispose();
 	}
 }
