@@ -16,6 +16,7 @@ import {
 } from "./boat-parts";
 import type { Palette } from "./palette";
 import { SUN_DIRECTION } from "./water";
+import { rideSwell, swellHeightAt } from "./swell";
 
 export { BOAT_LENGTH, BOAT_SCALE };
 
@@ -113,7 +114,7 @@ export function createBoatModel(palette: Palette): BoatModel {
 	const bowWave = new Mesh(bowWaveGeometry(palette.wake), foam);
 	frame.add(bowWave);
 
-	const shadow = new Mesh(shadowGeometry(palette.shadow), foam);
+	const shadow = new Mesh(shadowGeometry(palette.shadow), rideSwell(foam.clone()));
 	shadow.rotation.y = Math.atan2(SHADOW_X, SHADOW_Z);
 	shadow.renderOrder = -1;
 	group.add(shadow);
@@ -144,12 +145,21 @@ export function createBoatModel(palette: Palette): BoatModel {
 			jibSwing += normalizeAngle(targetJib - jibSwing) * 0.07;
 			luff += ((inIrons ? 1 : 0) - luff) * 0.12;
 
-			// Ride the swell: bob and pitch, a touch livelier at speed.
-			const phase = timeSec * 1.15 + (pose.x - pose.y) * 0.06;
-			frame.position.set(pose.x, Math.sin(phase) * 0.1 - 0.03, -pose.y);
+			// Ride the swell: float at the water's height, pitch with the slope
+			// from stern to bow and roll with it from side to side.
+			const fx = Math.sin(pose.heading), fz = -Math.cos(pose.heading);
+			const wx = pose.x, wz = -pose.y;
+			const half = BOAT_LENGTH / 2;
+			const bow = swellHeightAt(wx + fx * half, wz + fz * half);
+			const stern = swellHeightAt(wx - fx * half, wz - fz * half);
+			const port = swellHeightAt(wx + fz * 1.2, wz - fx * 1.2);
+			const starboard = swellHeightAt(wx - fz * 1.2, wz + fx * 1.2);
+			const centre = (bow + stern + port + starboard) / 4;
+			frame.position.set(pose.x, centre - 0.05, -pose.y);
 			frame.rotation.y = -pose.heading;
-			heel.rotation.z = heelAngle + Math.sin(timeSec * 1.7) * 0.025;
-			heel.rotation.x = Math.cos(phase) * 0.03 + Math.sin(timeSec * 3.3) * 0.012 * power - power * 0.035;
+			// Damped: a boat does not follow every ripple.
+			heel.rotation.z = heelAngle + Math.atan2(port - starboard, 2.4) * 0.6;
+			heel.rotation.x = Math.atan2(bow - stern, BOAT_LENGTH) * 0.8 - power * 0.035 + Math.sin(timeSec * 3.3) * 0.008 * power;
 
 			// Sails belly to leeward, swap sides as the boom crosses, and
 			// flutter flat when the boat is head to wind.
@@ -169,7 +179,7 @@ export function createBoatModel(palette: Palette): BoatModel {
 			bowWave.scale.set(1, spray * 1.5 * surge, 0.6 + 0.5 * spray);
 			bowWave.position.z = -(BOAT_LENGTH / 2) * (1 - (0.6 + 0.5 * spray));
 
-			shadow.position.set(pose.x + SHADOW_X * SHADOW_REACH, 0.02, -pose.y + SHADOW_Z * SHADOW_REACH);
+			shadow.position.set(pose.x + SHADOW_X * SHADOW_REACH, 0, -pose.y + SHADOW_Z * SHADOW_REACH);
 			shadow.scale.set(2.7, 1, 6.2);
 		},
 		dispose() {

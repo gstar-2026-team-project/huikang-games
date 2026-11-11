@@ -1,6 +1,7 @@
 import { InstancedMesh, MeshBasicMaterial, Object3D, PlaneGeometry, type Scene } from "three";
 import type { Point } from "../game/course";
 import type { Palette } from "./palette";
+import { rideSwell } from "./swell";
 
 /** Most dashes a guide path can draw; longer paths are cut short at the far end. */
 const MAX_GUIDE_DASHES = 160;
@@ -16,7 +17,7 @@ export class GuidePath {
 		geometry.rotateX(-Math.PI / 2);
 		this.mesh = new InstancedMesh(
 			geometry,
-			new MeshBasicMaterial({ color: palette.buoyNext, transparent: true, opacity: 0.8, depthWrite: false }),
+			rideSwell(new MeshBasicMaterial({ color: palette.buoyNext, transparent: true, opacity: 0.8, depthWrite: false })),
 			MAX_GUIDE_DASHES,
 		);
 		this.mesh.count = 0;
@@ -38,7 +39,7 @@ export class GuidePath {
 			const heading = Math.atan2(b.x - a.x, b.y - a.y);
 			for (let d = GUIDE_DASH_SPACING / 2; d < length && count < MAX_GUIDE_DASHES; d += GUIDE_DASH_SPACING) {
 				const f = d / length;
-				this.dummy.position.set(a.x + (b.x - a.x) * f, 0.05, -(a.y + (b.y - a.y) * f));
+				this.dummy.position.set(a.x + (b.x - a.x) * f, 0, -(a.y + (b.y - a.y) * f));
 				this.dummy.rotation.set(0, -heading, 0);
 				this.dummy.updateMatrix();
 				this.mesh.setMatrixAt(count++, this.dummy.matrix);

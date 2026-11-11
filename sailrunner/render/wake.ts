@@ -7,6 +7,7 @@ import {
 	MeshBasicMaterial,
 } from "three";
 import type { Palette } from "./palette";
+import { rideSwell } from "./swell";
 
 /** Trail samples kept; one is dropped every `SPACING` world units sailed. */
 const SAMPLES = 56;
@@ -73,12 +74,14 @@ export class Wake {
 		geometry.setAttribute("position", this.positionAttribute);
 		geometry.setAttribute("color", this.colorAttribute);
 		geometry.setIndex(index);
-		this.material = new MeshBasicMaterial({
-			vertexColors: true,
-			transparent: true,
-			depthWrite: false,
-			side: DoubleSide,
-		});
+		this.material = rideSwell(
+			new MeshBasicMaterial({
+				vertexColors: true,
+				transparent: true,
+				depthWrite: false,
+				side: DoubleSide,
+			}),
+		);
 		this.mesh = new Mesh(geometry, this.material);
 		// The ribbon is rewritten every frame, far from the mesh origin.
 		this.mesh.frustumCulled = false;
@@ -152,7 +155,7 @@ export class Wake {
 					const across = fade > 0 ? centre + (edge === 0 ? -half : half) : 0;
 					const p = (v + edge) * 3;
 					this.positions[p] = x + ax * across;
-					this.positions[p + 1] = 0.035;
+					this.positions[p + 1] = 0;
 					this.positions[p + 2] = z + az * across;
 					const c = (v + edge) * 4;
 					this.colors[c] = r;

@@ -17,6 +17,7 @@ import type { Course } from "../game/course";
 import { markRadius } from "../game/race";
 import { MeshBuilder, place } from "./mesh-builder";
 import type { Palette } from "./palette";
+import { rideSwell, swellHeightAt } from "./swell";
 
 const BUOY_SCALE = 1.15;
 /** Top of the finish pole, in buoy units. */
@@ -127,9 +128,9 @@ export class Marks {
 				depthWrite: false,
 				side: DoubleSide,
 			});
-			const ringMesh = new Mesh(new RingGeometry(radius - 0.8, radius, 64), ring);
+			const ringMesh = new Mesh(new RingGeometry(radius - 0.8, radius, 64), rideSwell(ring));
 			ringMesh.rotation.x = -Math.PI / 2;
-			ringMesh.position.y = 0.06;
+			ringMesh.position.y = 0;
 			group.add(buoy, ringMesh);
 			this.root.add(group);
 			this.views.push({ group, buoy, body, ring, flag, painted: null });
@@ -160,10 +161,12 @@ export class Marks {
 			view.ring.color.copy(color);
 			view.ring.opacity = next ? 0.72 + 0.22 * Math.sin(timeSec * 3) : done ? 0.16 : 0.34;
 
-			const phase = timeSec * 1.3 + index * 1.9;
-			view.buoy.position.y = Math.sin(phase) * 0.14 - 0.05;
-			view.buoy.rotation.z = Math.sin(phase * 0.8 + 1) * 0.07;
-			view.buoy.rotation.x = Math.cos(phase * 0.9) * 0.06;
+			// Float on the swell, tipping with its slope.
+			const { x: mx, z: mz } = view.group.position;
+			const h = swellHeightAt(mx, mz);
+			view.buoy.position.y = h - 0.05;
+			view.buoy.rotation.z = Math.atan2(swellHeightAt(mx - 1, mz) - swellHeightAt(mx + 1, mz), 2) * 0.7;
+			view.buoy.rotation.x = Math.atan2(swellHeightAt(mx, mz + 1) - swellHeightAt(mx, mz - 1), 2) * 0.7;
 			if (view.flag) {
 				// Fly downwind: `wind` is where the wind comes from.
 				view.flag.rotation.y = Math.atan2(-Math.cos(wind), -Math.sin(wind)) + Math.sin(timeSec * 5) * 0.2;

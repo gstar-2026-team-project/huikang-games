@@ -1,20 +1,6 @@
-import {
-	Group,
-	InstancedMesh,
-	Mesh,
-	MeshBasicMaterial,
-	Object3D,
-	PlaneGeometry,
-	ShaderMaterial,
-	Vector2,
-	Vector3,
-} from "three";
-import { createRng } from "../game/rng";
+import { BufferGeometry, Float32BufferAttribute, Group, Mesh, ShaderMaterial, Vector3 } from "three";
 import type { Palette } from "./palette";
-
-const FLECK_COUNT = 420;
-/** Flecks tile the sea in a square this wide around the camera target. */
-const FLECK_CELL = 320;
+import { SWELL_GLSL, setSwell, SWELL_MAX, swellUniforms } from "./swell";
 
 /** Distance fog shared by the water shader and the scene's built-in fog. */
 export const FOG_NEAR = 220;
@@ -23,44 +9,81 @@ export const FOG_FAR = 1000;
 /** World-space direction towards the sun (unit length). */
 export const SUN_DIRECTION = new Vector3(-0.46, 0.4, -0.79).normalize();
 
+/** The water mesh: rings of vertices around the camera, close together near it and spread out far away. */
+const SPOKES = 120;
+const INNER_RADIUS = 0.6;
+/** Just past the distance where the fog is solid: nothing further could be seen. */
+const OUTER_RADIUS = FOG_FAR * 1.1;
+/** Each ring is this much wider than the one inside it, so cells stay roughly square. */
+const RING_GROWTH = 1 + (2 * Math.PI) / SPOKES;
+
+function polarGrid(): BufferGeometry {
+	const radii: number[] = [0];
+	for (let r = INNER_RADIUS; r < OUTER_RADIUS; r *= RING_GROWTH) radii.push(r);
+	radii.push(OUTER_RADIUS);
+	const positions: number[] = [];
+	for (const r of radii) {
+		for (let s = 0; s < SPOKES; s++) {
+			const a = (s / SPOKES) * Math.PI * 2;
+			positions.push(Math.cos(a) * r, 0, Math.sin(a) * r);
+		}
+	}
+	const index: number[] = [];
+	for (let i = 0; i < radii.length - 1; i++) {
+		for (let s = 0; s < SPOKES; s++) {
+			const a = i * SPOKES + s;
+			const b = i * SPOKES + ((s + 1) % SPOKES);
+			const c = a + SPOKES;
+			const d = b + SPOKES;
+			// Counter-clockwise seen from above, so the faces point up.
+			index.push(a, b, c, b, d, c);
+		}
+	}
+	const geometry = new BufferGeometry();
+	geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
+	geometry.setIndex(index);
+	return geometry;
+}
+
 const VERTEX = /* glsl */ `
+${SWELL_GLSL}
 varying vec3 vWorld;
+varying vec3 vNormal;
+varying float vCrest;
 void main() {
 	vec4 world = modelMatrix * vec4(position, 1.0);
+	float dist = distance(world.xz, cameraPosition.xz);
+	vec3 normal;
+	vec3 offset = swellSurface(world.xz, dist, normal);
+	world.xyz += offset;
 	vWorld = world.xyz;
+	vNormal = normal;
+	vCrest = offset.y;
 	gl_Position = projectionMatrix * viewMatrix * world;
 }`;
 
-// The plane stays flat: every wave is shading. The sea is cut into triangular
-// facets, each lit by the swell's slope at its centre, which gives a low-poly
-// look for the price of six trig calls a pixel and no geometry at all.
+// Shading: the swell's normal plus fine ripples too small for the mesh, a
+// deep body colour lit through the crests, sky reflected at grazing angles,
+// sun glitter, and foam where crests stand highest.
 const FRAGMENT = /* glsl */ `
+uniform float uSwellTime;
+uniform vec2 uSwellWind;
 uniform vec3 uDeep;
 uniform vec3 uSea;
 uniform vec3 uHaze;
 uniform vec3 uSun;
 uniform vec3 uFoam;
 uniform vec3 uSunDir;
-uniform vec2 uWind;
-uniform float uTime;
 uniform float uFogNear;
 uniform float uFogFar;
+uniform float uSwellMax;
 varying vec3 vWorld;
+varying vec3 vNormal;
+varying float vCrest;
 
-const float FACET = 4.0;
-
-vec2 facetCentre(vec2 p) {
-	vec2 q = vec2(p.x - p.y * 0.5773503, p.y * 1.1547005) / FACET;
-	vec2 cell = floor(q);
-	vec2 f = q - cell;
-	vec2 c = cell + mix(vec2(1.0 / 3.0), vec2(2.0 / 3.0), step(1.0, f.x + f.y));
-	return vec2(c.x + c.y * 0.5, c.y * 0.8660254) * FACET;
-}
-
-// Height in x, slope in yz, of one swell train travelling along 'dir'.
-vec3 wave(vec2 p, vec2 dir, float k, float speed, float phase) {
-	float a = dot(p, dir) * k - uTime * speed + phase;
-	return vec3(sin(a), cos(a) * k * dir);
+// Slope of one ripple train (fragment-only detail): wavenumber k, angular speed w.
+vec2 ripple(vec2 p, vec2 dir, float k, float w, float amp, float phase) {
+	return dir * (k * amp * cos(k * dot(dir, p) - w * uSwellTime + phase));
 }
 
 void main() {
@@ -68,91 +91,75 @@ void main() {
 	float dist = length(toFrag);
 	vec3 view = -toFrag / dist;
 
-	// Facets shrink below a pixel far away; fade them out before they shimmer.
-	float detail = 1.0 - smoothstep(60.0, 260.0, dist);
-	vec2 p = mix(vWorld.xz, facetCentre(vWorld.xz), step(0.001, detail));
-	vec2 across = vec2(-uWind.y, uWind.x);
-	vec3 w = wave(p, uWind, 0.1, 0.9, 0.0) * 0.5
-		+ wave(p, normalize(uWind + across * 0.6), 0.21, 1.3, 1.7) * 0.3
-		+ wave(p, normalize(uWind - across * 0.8), 0.37, 1.9, 4.1) * 0.2;
-	vec3 normal = normalize(vec3(-w.y * 1.5 * detail, 1.0, -w.z * 1.5 * detail));
+	vec2 across = vec2(-uSwellWind.y, uSwellWind.x);
+	// Three ripple trains at unrelated lengths (5.3, 3.1, 1.9 m) and angles, so they
+	// never line up into a regular weave; they fade out before they would alias,
+	// and are not computed at all beyond that.
+	float near = 1.0 - smoothstep(12.0, 55.0, dist);
+	vec3 normal = vNormal;
+	if (near > 0.0) {
+		vec2 slope = ripple(vWorld.xz, normalize(uSwellWind + across * 0.31), 1.1855, 3.4102, 0.035, 0.0)
+			+ ripple(vWorld.xz, normalize(uSwellWind - across * 0.67), 2.0268, 4.4590, 0.022, 2.3)
+			+ ripple(vWorld.xz, normalize(across + uSwellWind * 0.4), 3.3069, 5.6956, 0.012, 3.7);
+		normal = normalize(vNormal + vec3(-slope.x, 0.0, -slope.y) * near);
+	}
 
-	// Deep and saturated underfoot, paler towards the horizon.
-	vec3 color = mix(uDeep, uSea, smoothstep(12.0, 150.0, dist));
-	color *= 1.0 + 0.1 * w.x * detail;
-	float facing = max(dot(normal, uSunDir), 0.0);
-	color *= 0.8 + 0.42 * facing;
-	// Half-flattened normal: neighbouring facets should not flip between sea and sky.
-	vec3 soft = normalize(normal + vec3(0.0, 1.0, 0.0));
-	float fresnel = pow(1.0 - max(dot(soft, view), 0.0), 5.0);
-	color = mix(color, uHaze, fresnel * 0.42 * (0.45 + 0.55 * smoothstep(10.0, 90.0, dist)));
+	float crest = clamp(vCrest / uSwellMax, -1.0, 1.0);
+	// Deep and saturated underfoot, paler towards the horizon; crests lit through.
+	vec3 body = mix(uDeep, uSea, smoothstep(10.0, 180.0, dist));
+	body = mix(body, uSea * 1.18, smoothstep(0.2, 0.9, crest) * 0.45);
+	float lambert = max(dot(normal, uSunDir), 0.0);
+	vec3 color = body * (0.72 + 0.4 * lambert);
 
-	// Sun glitter: a tight reflection on each facet, and a soft column of
-	// light on the water under the sun that survives where facets fade.
+	// Sky reflected at grazing angles (Schlick), strongest towards the horizon.
+	float cosV = max(dot(normal, view), 0.0);
+	float fresnel = 0.02 + 0.98 * pow(1.0 - cosV, 5.0);
+	color = mix(color, uHaze, clamp(fresnel * 0.75, 0.0, 0.6));
+
+	// Sun: a sharp glint on each wave face and a broad sheen on the path below the sun.
 	vec3 mirror = reflect(-view, normal);
-	float glint = pow(max(dot(mirror, uSunDir), 0.0), 140.0);
-	vec2 sunAzimuth = normalize(uSunDir.xz);
-	float column = pow(max(dot(normalize(toFrag.xz), sunAzimuth), 0.0), 220.0);
-	float path = column * smoothstep(20.0, 160.0, dist) * (0.3 + 0.25 * w.x * detail);
-	// Facet glints gather towards the sun rather than speckling the whole sea.
-	float towardsSun = pow(max(dot(normalize(toFrag.xz), sunAzimuth), 0.0), 6.0);
-	// No glints underfoot, where one facet would flood a patch of screen.
-	float sparkle = detail * smoothstep(22.0, 80.0, dist) * (0.08 + 0.6 * towardsSun);
-	color += uSun * (glint * sparkle + path);
+	float glint = pow(max(dot(mirror, uSunDir), 0.0), 260.0) * 2.2;
+	float sheen = pow(max(dot(mirror, uSunDir), 0.0), 24.0) * 0.16;
+	// Underfoot a single wave face fills a patch of screen: keep its glare soft there.
+	color += uSun * (glint + sheen) * smoothstep(10.0, 60.0, dist);
 
-	// Whitecaps on the sharpest crests.
-	color = mix(color, uFoam, smoothstep(0.8, 0.98, w.x) * 0.22 * detail);
+	// Whitecaps break on the highest, steepest crests, in streaks along the wind.
+	float streak = 0.5 + 0.5 * sin(dot(vWorld.xz, across) * 0.9 + sin(dot(vWorld.xz, uSwellWind) * 0.35) * 2.0);
+	float foam = smoothstep(0.62, 0.95, crest) * smoothstep(0.35, 0.9, streak) * (1.0 - smoothstep(120.0, 300.0, dist));
+	color = mix(color, uFoam, foam * 0.75);
 
 	float fog = clamp((dist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
 	gl_FragColor = vec4(mix(color, uHaze, fog), 1.0);
 	#include <colorspace_fragment>
 }`;
 
-/** The sea: one shaded plane that follows the boat, plus wind flecks. */
+/** The sea: one swell-displaced mesh that follows the camera out to the horizon. */
 export class Sea {
 	readonly root = new Group();
 	private water: Mesh;
 	private material: ShaderMaterial;
-	private flecks: InstancedMesh;
-	private fleckBase: Array<[number, number]> = [];
-	private dummy = new Object3D();
 
 	constructor(palette: Palette) {
 		this.material = new ShaderMaterial({
 			vertexShader: VERTEX,
 			fragmentShader: FRAGMENT,
 			uniforms: {
+				...swellUniforms,
 				uDeep: { value: palette.seaDeep },
 				uSea: { value: palette.sea },
 				uHaze: { value: palette.sky },
 				uSun: { value: palette.sun },
 				uFoam: { value: palette.fleck },
 				uSunDir: { value: SUN_DIRECTION },
-				uWind: { value: new Vector2(0, 1) },
-				uTime: { value: 0 },
 				uFogNear: { value: FOG_NEAR },
 				uFogFar: { value: FOG_FAR },
+				uSwellMax: { value: SWELL_MAX },
 			},
 		});
-		const plane = new PlaneGeometry(3600, 3600);
-		plane.rotateX(-Math.PI / 2);
-		this.water = new Mesh(plane, this.material);
+		this.water = new Mesh(polarGrid(), this.material);
+		// The mesh is moved under the camera every frame; its bounds would go stale.
 		this.water.frustumCulled = false;
 		this.root.add(this.water);
-
-		const fleckGeometry = new PlaneGeometry(2.6, 0.32);
-		fleckGeometry.rotateX(-Math.PI / 2);
-		this.flecks = new InstancedMesh(
-			fleckGeometry,
-			new MeshBasicMaterial({ color: palette.fleck, transparent: true, opacity: 0.5, depthWrite: false }),
-			FLECK_COUNT,
-		);
-		const rng = createRng(7);
-		for (let i = 0; i < FLECK_COUNT; i++) {
-			this.fleckBase.push([rng() * FLECK_CELL, rng() * FLECK_CELL]);
-		}
-		this.flecks.frustumCulled = false;
-		this.root.add(this.flecks);
 	}
 
 	setPalette(palette: Palette): void {
@@ -162,37 +169,19 @@ export class Sea {
 		uniforms["uHaze"]!.value = palette.sky;
 		uniforms["uSun"]!.value = palette.sun;
 		uniforms["uFoam"]!.value = palette.fleck;
-		(this.flecks.material as MeshBasicMaterial).color.copy(palette.fleck);
 	}
 
-	/** Re-centre the water and flecks on the focus point (world x, z). */
-	update(focusX: number, focusZ: number, wind: number, timeSec: number): void {
-		this.water.position.set(focusX, 0, focusZ);
-		const uniforms = this.material.uniforms;
-		// The swell runs downwind: `wind` is where the wind comes from.
-		(uniforms["uWind"]!.value as Vector2).set(-Math.sin(wind), Math.cos(wind));
-		// Wrapped so the phase stays precise in a long session; every wave speed
-		// in the shader is a multiple of 0.1, so the wrap is seamless.
-		uniforms["uTime"]!.value = timeSec % (Math.PI * 20);
-		const fleckAngle = -wind + Math.PI / 2;
-		for (let i = 0; i < FLECK_COUNT; i++) {
-			const [bx, bz] = this.fleckBase[i]!;
-			const x = bx + FLECK_CELL * Math.round((focusX - bx) / FLECK_CELL);
-			const z = bz + FLECK_CELL * Math.round((focusZ - bz) / FLECK_CELL);
-			this.dummy.position.set(x, 0.04, z);
-			this.dummy.rotation.set(0, fleckAngle, 0);
-			const s = 0.75 + 0.35 * Math.sin(timeSec * 0.9 + i);
-			this.dummy.scale.set(s, 1, 1);
-			this.dummy.updateMatrix();
-			this.flecks.setMatrixAt(i, this.dummy.matrix);
-		}
-		this.flecks.instanceMatrix.needsUpdate = true;
+	/**
+	 * Centre the water under the camera and move the swell on. The waves are
+	 * computed from world position, so moving the mesh never moves the waves.
+	 */
+	update(cameraX: number, cameraZ: number, wind: number, timeSec: number): void {
+		this.water.position.set(cameraX, 0, cameraZ);
+		setSwell(wind, timeSec);
 	}
 
 	dispose(): void {
 		this.water.geometry.dispose();
 		this.material.dispose();
-		this.flecks.geometry.dispose();
-		(this.flecks.material as MeshBasicMaterial).dispose();
 	}
 }
