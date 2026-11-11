@@ -12,7 +12,9 @@ import { SailingScene } from "../render/scene";
 import { type HudNodes, HudWriter } from "./hud-writer";
 import { IdealPath } from "./ideal-path";
 
-type Mode = "ready" | "racing" | "lesson" | "replay" | "paused";
+import type { Mode, RegattaProbe } from "./probe";
+
+export type { RegattaProbe } from "./probe";
 
 export type { HudNodes } from "./hud-writer";
 
@@ -31,22 +33,6 @@ export interface ReplayRun {
 	timeMs: number;
 }
 
-/** Read-only snapshot for browser tests that sail the course (tests/autopilot.ts). */
-export interface RegattaProbe {
-	mode: Mode;
-	x: number;
-	y: number;
-	heading: number;
-	wind: number;
-	nextMark: { x: number; y: number } | null;
-	lessonStep: number | null;
-}
-
-declare global {
-	interface Window {
-		__regattaProbe?: () => RegattaProbe;
-	}
-}
 
 /** Ambient frame interval on screens where nothing needs to move. */
 const IDLE_FRAME_MS = 250;
@@ -89,6 +75,8 @@ export class RaceController {
 	private minimapColors: MinimapColors;
 	private readyPose: BoatPose = { x: 0, y: 0, heading: 0, speed: 0 };
 	private idealPath = new IdealPath();
+	/** A sheet (help, replays) covers the scene: let it rest. */
+	private covered = false;
 
 	constructor(
 		canvas: HTMLCanvasElement,
@@ -143,6 +131,12 @@ export class RaceController {
 		this.readyPose = { ...createRace(course).boat };
 		this.snapCamera = true;
 		this.planPath();
+		this.wake();
+	}
+
+	/** A sheet covers the scene; while it does, the start line need not animate. */
+	setCovered(covered: boolean): void {
+		this.covered = covered;
 		this.wake();
 	}
 
@@ -296,7 +290,9 @@ export class RaceController {
 		if (!course) return;
 		this.advance(course, dt);
 
-		const active = this.steering() || this.mode === "replay" || now < this.awakeUntil;
+		// The start line is the first thing a player sees: it moves at full rate, never a slideshow or a still.
+		const active =
+			this.steering() || this.mode === "replay" || (this.mode === "ready" && !this.covered) || now < this.awakeUntil;
 		// Animation time only runs while frames come at full rate. On idle screens the
 		// occasional ambient frame then repeats a still scene instead of a 4 fps stutter.
 		if (active) this.wallSec += dt;

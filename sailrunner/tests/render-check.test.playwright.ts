@@ -60,7 +60,7 @@ async function key(frame: Frame, name: string, down: boolean): Promise<void> {
 const screens: RenderCheckScreen[] = [
 	{
 		name: "start line",
-		kind: "idle",
+		kind: "play",
 		reach: async ({ frame }) => {
 			await frame.locator('[data-testid="start-race"]').waitFor({ timeout: 15_000 });
 		},
@@ -113,7 +113,7 @@ const screens: RenderCheckScreen[] = [
 	},
 	{
 		name: "back at the start line",
-		kind: "idle",
+		kind: "play",
 		reach: async ({ frame }) => {
 			await frame.getByRole("button", { name: "Exit lesson" }).click();
 			await frame.locator('[data-testid="start-race"]').waitFor();

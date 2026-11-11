@@ -26,6 +26,7 @@ import { Wake } from "./wake";
 import { FOG_FAR, FOG_NEAR, Sea } from "./water";
 import { WindArrows } from "./wind-arrows";
 import { addToScene, GuidePath } from "./world";
+import { AdaptiveResolution } from "./adaptive-resolution";
 
 /** Chase camera: low and close behind the boat for drama, looking a little ahead. */
 const CAMERA_BACK = 16.5;
@@ -78,12 +79,19 @@ export class SailingScene {
 	private baseFov = 54;
 	private speedFov = 0;
 	private forward = new Vector3();
+	private resolution: AdaptiveResolution;
+	private width = 1;
+	private height = 1;
 
 	constructor(canvas: HTMLCanvasElement) {
 		const shared = acquireSharedRenderBudget();
 		this.renderer = new WebGLRenderer({ canvas, ...shared.rendererOptions() });
 		this.budget = adoptSharedRenderBudgetRenderer(this.renderer);
 		this.pixelRatio = this.budget.defaults.pixelRatio;
+		this.resolution = new AdaptiveResolution(this.renderer.getPixelRatio(), (ratio) => {
+			this.renderer.setPixelRatio(ratio);
+			this.renderer.setSize(this.width, this.height, false);
+		});
 		const palette = readPalette();
 		setSkyPalette(palette);
 		this.boat = createBoatModel(palette);
@@ -163,6 +171,8 @@ export class SailingScene {
 
 	resize(width: number, height: number): void {
 		if (width === 0 || height === 0) return;
+		this.width = width;
+		this.height = height;
 		this.renderer.setSize(width, height, false);
 		this.camera.aspect = width / height;
 		// Narrow phones get a wider view so the marks stay in frame.
@@ -172,6 +182,7 @@ export class SailingScene {
 	}
 
 	render(frame: FrameState): void {
+		this.resolution.frame(performance.now());
 		const { pose } = frame;
 		// Centred on last frame's camera; set first so the boat and buoys read this frame's swell.
 		this.sea.update(this.camera.position.x, this.camera.position.z, frame.wind, frame.timeSec);

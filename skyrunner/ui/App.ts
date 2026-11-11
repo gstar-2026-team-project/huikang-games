@@ -66,7 +66,8 @@ export function mountApp(root: HTMLElement, props: AppProps): () => void {
 				if (playing) minimap.draw(flight.sim, palette(), darkQ?.matches ? "dark" : "light");
 				hud.update(flight.sim, playing && flight.sim.phase === "flying", input.knob, dt);
 			},
-			isIdle: () => flight.screen !== "play" && !hud.busy,
+			// The home screen is the first thing a player sees: it moves at full rate.
+			isIdle: () => flight.screen !== "play" && flight.screen !== "home" && !hud.busy,
 		},
 		budget,
 	);

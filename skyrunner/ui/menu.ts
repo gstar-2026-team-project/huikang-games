@@ -2,6 +2,9 @@
 import { levelCourse } from "../game/levels";
 import { dailyDisplay, dayLabel, LEVEL_COUNT } from "../game/modes";
 
+/** A keyboard-and-mouse device: name the keys instead of the touch controls. */
+const FINE_POINTER = typeof window !== "undefined" && !!window.matchMedia?.("(hover: hover) and (pointer: fine)").matches;
+
 export type PanelAction =
 	| "daily" | "levels" | "free" | "level" | "again" | "next" | "menu" | "resume" | "invite" | "back";
 
@@ -36,7 +39,9 @@ export function homePanel(f: HomeFacts): PanelModel {
 	const total = f.stars.reduce((a, b) => a + b, 0);
 	return {
 		title: "Ready for takeoff",
-		text: "Left stick steers. The slider sets your speed: slow down to turn tighter.",
+		text: FINE_POINTER
+			? "Arrow keys steer, E and Q set your speed: slow down to turn tighter."
+			: "Left stick steers. The slider sets your speed: slow down to turn tighter.",
 		layout: "modes",
 		buttons: [
 			{

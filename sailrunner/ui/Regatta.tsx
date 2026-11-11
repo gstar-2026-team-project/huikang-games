@@ -301,6 +301,11 @@ export function Regatta({ store, poe, resumeAudioContext, suppressLongPressMagni
 		void store.mutate.setShowPath({ showPath: !data.showPath });
 	}, [store, data.showPath]);
 
+	// A help sheet over the start line lets the scene rest.
+	useEffect(() => {
+		controllerRef.current?.setCovered(help);
+	}, [help]);
+
 	// The controller draws the ideal path; the saved preference decides whether it does.
 	useEffect(() => {
 		controllerRef.current?.setShowPath(data.showPath);

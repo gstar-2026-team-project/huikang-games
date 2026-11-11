@@ -106,8 +106,9 @@ export class FlightInput {
 		if (k.has("ArrowDown") || k.has("s")) pitch = -1;
 		if (this.invert) pitch = -pitch;
 		let throttleRate = 0;
-		if (k.has("Shift") || k.has("e")) throttleRate += KEY_THROTTLE_RATE;
-		if (k.has("Control") || k.has("q")) throttleRate -= KEY_THROTTLE_RATE;
+		// E opens the throttle, Q closes it (Shift and Ctrl clash with browser shortcuts).
+		if (k.has("e")) throttleRate += KEY_THROTTLE_RATE;
+		if (k.has("q")) throttleRate -= KEY_THROTTLE_RATE;
 		return { roll, pitch, throttleRate };
 	}
 

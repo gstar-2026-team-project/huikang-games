@@ -17,7 +17,7 @@ export const SHELL_HTML = `
   <button id="invert" type="button">Drag up: climb</button>
   <button id="path" type="button" data-testid="path-toggle" aria-pressed="false">Ideal path: off</button>
   <div id="stickZone" aria-label="Steering stick"><div id="knob"></div></div>
-  <div id="throttle" aria-label="Throttle"><div id="thrFill"></div><div id="thrLabel">THR</div></div>
+  <div id="throttle" aria-label="Throttle (E up, Q down)"><div id="thrFill"></div><div id="thrLabel">THR</div><div class="thr-key" id="thrKeyUp" aria-hidden="true">E ▲</div><div class="thr-key" id="thrKeyDown" aria-hidden="true">Q ▼</div></div>
   <div id="hint">Fly through the golden rings</div>
 </div>
 <div id="overlay" data-testid="overlay">
