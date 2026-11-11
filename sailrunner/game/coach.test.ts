@@ -66,8 +66,14 @@ describe("coachAction", () => {
 		expect(coachAction(boat(50), -50 * DEG, wind)).toEqual({ kind: "tack", dir: -1 });
 		expect(coachAction(boat(-50), 50 * DEG, wind)).toEqual({ kind: "tack", dir: 1 });
 	});
-	test("crossing downwind is just a turn, not a tack", () => {
-		expect(coachAction(boat(150), -150 * DEG, wind).kind).toBe("turn");
+	test("crossing the wind downwind is a gybe, not a tack", () => {
+		expect(coachAction(boat(150), -150 * DEG, wind)).toEqual({ kind: "gybe", dir: 1 });
+	});
+
+	test("plans gybes to a mark dead downwind instead of running straight at it", () => {
+		const plan = planRoute({ x: 0, y: 0, heading: 160 * DEG, speed: 10 }, { x: 0, y: -300 }, wind, 1);
+		expect(plan.route).toHaveLength(3);
+		expect(Math.abs(plan.heading - wind)).toBeCloseTo(150 * DEG, 5);
 	});
 });
 

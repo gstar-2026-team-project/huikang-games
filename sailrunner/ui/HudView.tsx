@@ -14,9 +14,12 @@ export function useHudRefs() {
 	const vmg = useRef<HTMLSpanElement>(null);
 	const windArrow = useRef<HTMLSpanElement>(null);
 	const irons = useRef<HTMLDivElement>(null);
+	const pointer = useRef<HTMLSpanElement>(null);
+	const pointerArrow = useRef<HTMLSpanElement>(null);
+	const pointerText = useRef<HTMLSpanElement>(null);
 	const minimap = useRef<HTMLCanvasElement>(null);
 	return useMemo(() => {
-		const refs = { timer, marks, speed, speedBar, vmg, windArrow, irons, minimap };
+		const refs = { timer, marks, speed, speedBar, vmg, windArrow, irons, minimap, pointer, pointerArrow, pointerText };
 		/** The mounted nodes, or null if any is missing. */
 		const nodes = (): HudNodes | null => {
 			const n = {
@@ -27,6 +30,9 @@ export function useHudRefs() {
 				vmg: vmg.current,
 				windArrow: windArrow.current,
 				irons: irons.current,
+				pointer: pointer.current,
+				pointerArrow: pointerArrow.current,
+				pointerText: pointerText.current,
 			};
 			return Object.values(n).every(Boolean) ? (n as HudNodes) : null;
 		};
@@ -65,6 +71,12 @@ export function HudView({ refs, showRace, muted, showPath, leader, onHelp, onMut
 						0:00.0
 					</span>
 					<span ref={refs.marks} className="marks" data-testid="race-marks" />
+					<span ref={refs.pointer} className="mark-pointer" data-testid="mark-pointer" hidden>
+						<span ref={refs.pointerArrow} className="mark-pointer-arrow" aria-hidden="true">
+							➤
+						</span>
+						<span ref={refs.pointerText} />
+					</span>
 					{leader && (
 						<span className="leader-chip" data-testid="leader-chip">
 							<Avatar profile={leader.profile} size={18} />

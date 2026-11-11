@@ -112,10 +112,41 @@ describe("physics", () => {
 		expect(polar(Math.PI / 2)).toBeGreaterThan(polar((55 * Math.PI) / 180));
 	});
 
-	test("pointing into the wind bleeds speed to zero", () => {
-		let boat = { x: 0, y: 0, heading: 0, speed: 12 };
-		for (let i = 0; i < 600; i++) boat = stepBoat(boat, 0, 0, 1 / 60);
-		expect(boat.speed).toBeLessThan(0.1);
+	test("left head to wind, the boat coasts, stalls, then blows off and sails again", () => {
+		let boat = { x: 0, y: 0, heading: 0.01, speed: 12 };
+		let slowest = boat.speed;
+		let coastedAt1s = 0;
+		for (let i = 0; i < 60 * 30; i++) {
+			boat = stepBoat(boat, 0, 0, 1 / 60);
+			if (i === 59) coastedAt1s = boat.speed;
+			slowest = Math.min(slowest, boat.speed);
+		}
+		// Momentum carries it a while (a tack can be completed)...
+		expect(coastedAt1s).toBeGreaterThan(8);
+		// ...but it stalls, and the bow falls off to the side it was on.
+		expect(slowest).toBeLessThan(2);
+		expect(trueWindAngle(boat.heading, 0)).toBeGreaterThan(NO_GO_ANGLE);
+		expect(boat.speed).toBeGreaterThan(4);
+	});
+
+	test("a stopped boat barely steers; a moving one turns briskly", () => {
+		const turn = (speed: number) => stepBoat({ x: 0, y: 0, heading: Math.PI / 2, speed }, 1, 0, 1).heading - Math.PI / 2;
+		expect(turn(0)).toBeLessThan(0.2);
+		expect(turn(MAX_SPEED)).toBeGreaterThan(1);
+	});
+
+	test("downwind, a broad reach makes better progress than running dead downwind", () => {
+		const downwindVmg = (deg: number) => polar((deg * Math.PI) / 180) * -Math.cos((deg * Math.PI) / 180);
+		expect(downwindVmg(150)).toBeGreaterThan(downwindVmg(180));
+		expect(polar((105 * Math.PI) / 180)).toBe(1);
+	});
+
+	test("the boat slips to leeward, most when slow", () => {
+		// Heading east with the wind from the north: leeward is south (negative y).
+		const after = (speed: number) => stepBoat({ x: 0, y: 0, heading: Math.PI / 2, speed }, 0, 0, 1).y;
+		expect(after(0)).toBeLessThan(-0.3);
+		expect(after(MAX_SPEED)).toBeLessThan(0);
+		expect(after(MAX_SPEED)).toBeGreaterThan(after(0) * 3);
 	});
 
 	test("identical inputs give an identical run", () => {

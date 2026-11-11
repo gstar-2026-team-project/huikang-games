@@ -4,6 +4,8 @@ import { type Boat, normalizeAngle } from "./physics";
 const DEG = Math.PI / 180;
 /** Upwind legs are planned this far off the wind: clear of the no-go zone and still quick. */
 export const TACK_ANGLE = 50 * DEG;
+/** Downwind legs are planned this far off the wind: a broad reach beats running dead downwind. */
+export const GYBE_ANGLE = 150 * DEG;
 /** Within this heading error the coach says "hold this course". */
 const HOLD_TOLERANCE = 8 * DEG;
 /** The boat counts as on a tack once it is this far either side of the wind. */
@@ -22,7 +24,11 @@ export interface Plan {
 	side: Side;
 }
 
-export type CoachAction = { kind: "hold" } | { kind: "turn"; dir: Side } | { kind: "tack"; dir: Side };
+export type CoachAction =
+	| { kind: "hold" }
+	| { kind: "turn"; dir: Side }
+	| { kind: "tack"; dir: Side }
+	| { kind: "gybe"; dir: Side };
 
 function dir(heading: number): Point {
 	return { x: Math.sin(heading), y: Math.cos(heading) };
@@ -38,25 +44,29 @@ function twoLegs(from: Point, to: Point, d1: Point, d2: Point): { a: number; b: 
 
 /**
  * A good (not perfect) route to `target` from where the boat is now: straight
- * there when it's off the wind; otherwise along the current tack to the
- * layline, then one tack into the target. `prevSide` keeps the plan steady
- * while the boat is pointing straight into the wind.
+ * there when it's a reach; otherwise zig-zag, along the current tack (upwind)
+ * or gybe (downwind) to the layline, then one turn into the target.
+ * `prevSide` keeps the plan steady while the boat points straight into or
+ * away from the wind.
  */
 export function planRoute(boat: Boat, target: Point, wind: number, prevSide: Side): Plan {
 	const bearing = Math.atan2(target.x - boat.x, target.y - boat.y);
 	const off = normalizeAngle(bearing - wind);
-	if (Math.abs(off) >= TACK_ANGLE) {
+	const upwind = Math.abs(off) < TACK_ANGLE;
+	if (!upwind && Math.abs(off) <= GYBE_ANGLE) {
 		return { route: [{ x: boat.x, y: boat.y }, target], heading: bearing, side: off > 0 ? 1 : -1 };
 	}
+	const angle = upwind ? TACK_ANGLE : GYBE_ANGLE;
 	const rel = normalizeAngle(boat.heading - wind);
-	let side: Side = Math.abs(rel) > ON_TACK ? (rel > 0 ? 1 : -1) : prevSide;
-	let legs = twoLegs(boat, target, dir(wind + side * TACK_ANGLE), dir(wind - side * TACK_ANGLE));
+	const onSide = upwind ? Math.abs(rel) > ON_TACK : Math.abs(rel) < Math.PI - ON_TACK;
+	let side: Side = onSide ? (rel > 0 ? 1 : -1) : prevSide;
+	let legs = twoLegs(boat, target, dir(wind + side * angle), dir(wind - side * angle));
 	if (legs.a < TACK_NOW_DISTANCE) {
-		// At or past the layline on this tack: the other tack leads to the target.
+		// At or past the layline on this side: the other side leads to the target.
 		side = side === 1 ? -1 : 1;
-		legs = twoLegs(boat, target, dir(wind + side * TACK_ANGLE), dir(wind - side * TACK_ANGLE));
+		legs = twoLegs(boat, target, dir(wind + side * angle), dir(wind - side * angle));
 	}
-	const heading = wind + side * TACK_ANGLE;
+	const heading = wind + side * angle;
 	const first = dir(heading);
 	const corner = { x: boat.x + first.x * Math.max(0, legs.a), y: boat.y + first.y * Math.max(0, legs.a) };
 	return { route: [{ x: boat.x, y: boat.y }, corner, target], heading, side };
@@ -88,9 +98,10 @@ export function coachAction(boat: Boat, heading: number, wind: number): CoachAct
 	if (Math.abs(error) < HOLD_TOLERANCE) return { kind: "hold" };
 	const from = normalizeAngle(boat.heading - wind);
 	const to = normalizeAngle(heading - wind);
-	// Crossing from one side of the wind to the other while heading upwind is a tack.
-	const crossesWind = Math.sign(from) !== Math.sign(to) && Math.abs(from) < Math.PI / 2 && Math.abs(to) < Math.PI / 2;
-	if (crossesWind) return { kind: "tack", dir: from > 0 ? -1 : 1 };
+	// Crossing from one side of the wind to the other is a tack upwind and a gybe downwind.
+	const crosses = Math.sign(from) !== Math.sign(to);
+	if (crosses && Math.abs(from) < Math.PI / 2 && Math.abs(to) < Math.PI / 2) return { kind: "tack", dir: from > 0 ? -1 : 1 };
+	if (crosses && Math.abs(from) > Math.PI / 2 && Math.abs(to) > Math.PI / 2) return { kind: "gybe", dir: from > 0 ? 1 : -1 };
 	return { kind: "turn", dir: error > 0 ? 1 : -1 };
 }
 

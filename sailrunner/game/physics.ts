@@ -1,6 +1,11 @@
 import {
+	FALL_OFF_LIMIT,
+	FALL_OFF_RATE,
+	LEEWAY_ANGLE,
+	LEEWAY_DRIFT,
 	MAX_SPEED,
 	NO_GO_ANGLE,
+	STEERAGE_SPEED,
 	TURN_RATE_MIN,
 	TURN_RATE_SPEED_BONUS,
 	TURN_SPEED_BLEED,
@@ -48,29 +53,71 @@ function lerp(a: number, b: number, t: number): number {
 	return a + (b - a) * t;
 }
 
+/**
+ * The boat's polar: fraction of MAX_SPEED at each true wind angle (degrees,
+ * fraction). Shaped like a real keelboat's: nothing inside the no-go zone,
+ * best progress upwind at about 50°, fastest on a beam to broad reach, and
+ * slow dead downwind, so the quickest way down is a broad reach at about
+ * 150° with gybes, as racers sail it.
+ */
+const POLAR: ReadonlyArray<readonly [number, number]> = [
+	[38, 0],
+	[45, 0.7],
+	[52, 0.8],
+	[75, 0.95],
+	[105, 1],
+	[135, 0.92],
+	[150, 0.85],
+	[165, 0.72],
+	[180, 0.6],
+];
+
 /** Fraction of MAX_SPEED reachable at a given true wind angle (the boat's polar). */
 export function polar(twa: number): number {
 	if (twa < NO_GO_ANGLE) return 0;
-	if (twa < 50 * DEG) return lerp(0, 0.78, (twa - NO_GO_ANGLE) / (50 * DEG - NO_GO_ANGLE));
-	if (twa < 95 * DEG) return lerp(0.78, 1, (twa - 50 * DEG) / (45 * DEG));
-	if (twa < 150 * DEG) return lerp(1, 0.82, (twa - 95 * DEG) / (55 * DEG));
-	return lerp(0.82, 0.72, (twa - 150 * DEG) / (30 * DEG));
+	const deg = (twa * 180) / Math.PI;
+	for (let i = 1; i < POLAR.length; i++) {
+		const [a1, v1] = POLAR[i]!;
+		if (deg <= a1) {
+			const [a0, v0] = POLAR[i - 1]!;
+			return lerp(v0, v1, (deg - a0) / (a1 - a0));
+		}
+	}
+	return POLAR[POLAR.length - 1]![1];
 }
 
-/** Advance one fixed step. Pure: returns a new boat. */
+/**
+ * Advance one fixed step. Pure: returns a new boat.
+ *
+ * - Steering needs way on: a stopped boat barely turns.
+ * - Speed builds and fades with momentum, so a quick tack carries the boat
+ *   through the wind while a slow one stalls in irons.
+ * - Slow and pointing high, the bow blows off to the side it is already on
+ *   until the sail fills.
+ * - The boat slips to leeward: a little when sailing, more when slow.
+ */
 export function stepBoat(boat: Boat, steer: Steer, wind: number, dt: number): Boat {
-	const speedFraction = Math.min(1, boat.speed / MAX_SPEED);
-	const turnRate = TURN_RATE_MIN + TURN_RATE_SPEED_BONUS * speedFraction;
-	const heading = normalizeAngle(boat.heading + steer * turnRate * dt);
-	const target = polar(trueWindAngle(heading, wind)) * MAX_SPEED;
-	const tau = target === 0 ? 1.3 : target > boat.speed ? 1.7 : 2.6;
+	const steerage = Math.min(1, boat.speed / STEERAGE_SPEED);
+	const turnRate = TURN_RATE_MIN + TURN_RATE_SPEED_BONUS * steerage;
+	const off = normalizeAngle(boat.heading - wind);
+	const stalled = Math.abs(off) < FALL_OFF_LIMIT ? 1 - steerage : 0;
+	const fallOff = (off >= 0 ? 1 : -1) * FALL_OFF_RATE * stalled;
+	const heading = normalizeAngle(boat.heading + (steer * turnRate + fallOff) * dt);
+	const twa = trueWindAngle(heading, wind);
+	const target = polar(twa) * MAX_SPEED;
+	// Accelerating takes a while; coasting through the wind takes longer still.
+	const tau = target === 0 ? 3 : target > boat.speed ? 2 : 3;
 	let speed = boat.speed + (target - boat.speed) * (1 - Math.exp(-dt / tau));
 	if (steer !== 0) speed *= 1 - TURN_SPEED_BLEED * dt;
+	// Leeway: pushed sideways, away from the wind.
+	const leeward = heading + (normalizeAngle(heading - wind) >= 0 ? Math.PI / 2 : -Math.PI / 2);
+	const beam = Math.sin(twa);
+	const slip = (LEEWAY_DRIFT * (1 - steerage) + speed * Math.tan(LEEWAY_ANGLE)) * beam;
 	return {
 		heading,
 		speed,
-		x: boat.x + Math.sin(heading) * speed * dt,
-		y: boat.y + Math.cos(heading) * speed * dt,
+		x: boat.x + (Math.sin(heading) * speed + Math.sin(leeward) * slip) * dt,
+		y: boat.y + (Math.cos(heading) * speed + Math.cos(leeward) * slip) * dt,
 	};
 }
 

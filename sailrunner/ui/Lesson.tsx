@@ -106,6 +106,7 @@ export function LessonDone({ onRace, onAgain }: { onRace(): void; onAgain(): voi
 function actionText(action: CoachAction): string {
 	if (action.kind === "hold") return "✓ Hold this course";
 	if (action.kind === "turn") return action.dir === -1 ? "◀ Turn left" : "Turn right ▶";
+	if (action.kind === "gybe") return action.dir === -1 ? "◀ Gybe now: turn left, stern through the wind" : "Gybe now: turn right, stern through the wind ▶";
 	return action.dir === -1 ? "◀ Tack now: turn left through the wind" : "Tack now: turn right through the wind ▶";
 }
 

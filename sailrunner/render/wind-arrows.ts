@@ -13,6 +13,8 @@ const DRIFT_SPEED = 4;
 const LIFE_S = 4;
 /** Arrows shrink to nothing toward the edge of the patch, so none pops in or out in view. */
 const FADE_START = 0.55;
+/** Arrows closer than this to the camera (m) shrink away. */
+const NEAR_CAMERA = 7;
 
 /** Deterministic 0..1 value for lattice cell (i, j) and salt k. */
 function hash(i: number, j: number, k: number): number {
@@ -65,8 +67,12 @@ export class WindArrows {
 		(this.mesh.material as MeshBasicMaterial).color.copy(palette.fleck);
 	}
 
-	/** `wind` is where the wind comes from (sim heading); the arrows point and drift the other way. */
-	update(focusX: number, focusZ: number, wind: number, timeSec: number): void {
+	/**
+	 * `wind` is where the wind comes from (sim heading); the arrows point and
+	 * drift the other way. Pass the camera's position to shrink the few arrows
+	 * passing right under it, which would otherwise fill the screen.
+	 */
+	update(focusX: number, focusZ: number, wind: number, timeSec: number, camera?: { x: number; z: number }): void {
 		const blow = wind + Math.PI;
 		const dirX = Math.sin(blow);
 		const dirZ = -Math.cos(blow);
@@ -89,7 +95,8 @@ export class WindArrows {
 				const x = wx + EXTENT * Math.round((focusX - wx) / EXTENT);
 				const z = wz + EXTENT * Math.round((focusZ - wz) / EXTENT);
 				const edge = Math.max(Math.abs(x - focusX), Math.abs(z - focusZ)) / half;
-				const size = Math.min(1, 2.5 * Math.sin(age * Math.PI)) * (1 - smoothstep(FADE_START, 1, edge));
+				let size = Math.min(1, 2.5 * Math.sin(age * Math.PI)) * (1 - smoothstep(FADE_START, 1, edge));
+				if (camera) size *= smoothstep(NEAR_CAMERA, NEAR_CAMERA * 2.2, Math.hypot(x - camera.x, z - camera.z));
 				this.dummy.position.set(x, 0, z);
 				this.dummy.rotation.set(0, -blow, 0);
 				// A collapsed arrow is invisible without a per-instance opacity.

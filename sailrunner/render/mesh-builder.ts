@@ -74,6 +74,45 @@ export class MeshBuilder {
 		return this;
 	}
 
+	/**
+	 * Like {@link add}, but each triangle takes its colour from `shade`, given
+	 * the triangle's centre and face normal after the transform. `warp` can
+	 * move each transformed vertex first (rough up a hillside, say).
+	 */
+	addShaded(
+		geometry: BufferGeometry,
+		matrix: Matrix4,
+		shade: (centre: Vector3, normal: Vector3) => Color,
+		warp?: (vertex: Vector3) => void,
+	): this {
+		const source = geometry.index ? geometry.toNonIndexed() : geometry;
+		const position = source.getAttribute("position");
+		const corners = [new Vector3(), new Vector3(), new Vector3()];
+		const centre = new Vector3();
+		const normal = new Vector3();
+		const edge = new Vector3();
+		const origin = new Vector3().setFromMatrixPosition(matrix);
+		for (let i = 0; i + 2 < position.count; i += 3) {
+			for (let k = 0; k < 3; k++) {
+				corners[k]!.fromBufferAttribute(position, i + k).applyMatrix4(matrix);
+				warp?.(corners[k]!);
+			}
+			const [a, b, c] = corners as [Vector3, Vector3, Vector3];
+			centre.copy(a).add(b).add(c).divideScalar(3);
+			normal.subVectors(b, a).cross(edge.subVectors(c, a)).normalize();
+			// Winding is not kept consistent: point the normal away from the part's origin.
+			if (normal.dot(edge.copy(centre).sub(origin)) < 0) normal.negate();
+			const color = shade(centre, normal);
+			for (const p of corners) {
+				this.positions.push(p.x, p.y, p.z);
+				this.colors.push(color.r, color.g, color.b);
+			}
+		}
+		if (source !== geometry) source.dispose();
+		geometry.dispose();
+		return this;
+	}
+
 	/** A tapered prism between two points (spars, poles). */
 	tube(from: Vec3, to: Vec3, radius: number, color: Color, sides = 5, endRadius = radius): this {
 		const a = new Vector3(...from);

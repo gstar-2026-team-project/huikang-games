@@ -15,7 +15,8 @@ import {
 	shadowGeometry,
 } from "./boat-parts";
 import type { Palette } from "./palette";
-import { SUN_DIRECTION } from "./water";
+import { BowSpray } from "./spray";
+import { rimMaterial, SUN_FLAT } from "./sun";
 import { rideSwell, swellHeightAt } from "./swell";
 
 export { BOAT_LENGTH, BOAT_SCALE };
@@ -29,7 +30,8 @@ export interface BoatPose {
 
 export interface BoatModel {
 	group: Group;
-	update(pose: BoatPose, wind: number, steer: number, timeSec: number): void;
+	/** `backlit` 0..1: how far the camera looks into the sun, so the sails glow. */
+	update(pose: BoatPose, wind: number, steer: number, timeSec: number, backlit: number): void;
 	dispose(): void;
 }
 
@@ -46,19 +48,22 @@ function sailFill(value: number): number {
 }
 
 /** Shadow centre offset and heading: it falls away from the sun. */
-const SHADOW_REACH = 3.6;
-const SUN_FLAT = Math.hypot(SUN_DIRECTION.x, SUN_DIRECTION.z);
-const SHADOW_X = -SUN_DIRECTION.x / SUN_FLAT;
-const SHADOW_Z = -SUN_DIRECTION.z / SUN_FLAT;
+const SHADOW_REACH = 4.2;
+const SHADOW_X = -SUN_FLAT.x;
+const SHADOW_Z = -SUN_FLAT.z;
 
 export function createBoatModel(palette: Palette): BoatModel {
-	const solid = new MeshLambertMaterial({ vertexColors: true, side: DoubleSide });
-	// Sailcloth glows a little when backlit instead of going grey.
-	const cloth = new MeshLambertMaterial({
-		vertexColors: true,
-		side: DoubleSide,
-		emissive: palette.sail.clone().multiplyScalar(0.2),
-	});
+	const solid = rimMaterial(new MeshLambertMaterial({ vertexColors: true, side: DoubleSide }), "solid");
+	// Sailcloth glows when the sun is behind it instead of going grey.
+	const cloth = rimMaterial(
+		new MeshLambertMaterial({
+			vertexColors: true,
+			side: DoubleSide,
+			emissive: palette.sail.clone().multiplyScalar(0.25),
+		}),
+		"cloth",
+	);
+	const sailGlow = palette.sail.clone().lerp(palette.sunGlow, 0.35);
 	const foam = new MeshBasicMaterial({
 		vertexColors: true,
 		transparent: true,
@@ -113,6 +118,8 @@ export function createBoatModel(palette: Palette): BoatModel {
 
 	const bowWave = new Mesh(bowWaveGeometry(palette.wake), foam);
 	frame.add(bowWave);
+	const bowSpray = new BowSpray(palette.wake, -BOAT_LENGTH / 2);
+	frame.add(bowSpray.points);
 
 	const shadow = new Mesh(shadowGeometry(palette.shadow), rideSwell(foam.clone()));
 	shadow.rotation.y = Math.atan2(SHADOW_X, SHADOW_Z);
@@ -128,7 +135,8 @@ export function createBoatModel(palette: Palette): BoatModel {
 
 	return {
 		group,
-		update(pose, wind, steer, timeSec) {
+		update(pose, wind, steer, timeSec, backlit) {
+			cloth.emissive.copy(palette.sail).multiplyScalar(0.22).lerp(sailGlow, backlit * 0.55);
 			const twa = trueWindAngle(pose.heading, wind);
 			const side = sailSide(pose.heading, wind);
 			const power = Math.min(1, pose.speed / MAX_SPEED);
@@ -178,6 +186,7 @@ export function createBoatModel(palette: Palette): BoatModel {
 			const surge = 1 + 0.12 * Math.sin(timeSec * 13) + 0.08 * Math.sin(timeSec * 7.3);
 			bowWave.scale.set(1, spray * 1.5 * surge, 0.6 + 0.5 * spray);
 			bowWave.position.z = -(BOAT_LENGTH / 2) * (1 - (0.6 + 0.5 * spray));
+			bowSpray.update(timeSec, Math.max(0, spray - 0.35) / 0.65, pose.speed);
 
 			shadow.position.set(pose.x + SHADOW_X * SHADOW_REACH, 0, -pose.y + SHADOW_Z * SHADOW_REACH);
 			shadow.scale.set(2.7, 1, 6.2);
@@ -186,7 +195,8 @@ export function createBoatModel(palette: Palette): BoatModel {
 			group.traverse((node) => {
 				if (node instanceof Mesh) node.geometry.dispose();
 			});
-			for (const material of [solid, cloth, foam]) material.dispose();
+			bowSpray.dispose();
+			for (const material of [solid, cloth, foam, shadow.material]) material.dispose();
 		},
 	};
 }

@@ -65,7 +65,8 @@ function section(t: number, side: 1 | -1): Vec3[] {
 /** Hull, deck, cabin, cockpit and mast as one vertex-coloured geometry. */
 export function hullGeometry(palette: Palette): BufferGeometry {
 	const builder = new MeshBuilder();
-	const bands = [palette.accent, palette.hull, palette.glass];
+	// White cove stripe under the sheer, navy topsides, red bottom paint.
+	const bands = [palette.stripe, palette.hull, palette.accent];
 	for (let i = 0; i < STATIONS - 1; i++) {
 		const t0 = i / (STATIONS - 1);
 		const t1 = (i + 1) / (STATIONS - 1);
@@ -85,7 +86,7 @@ export function hullGeometry(palette: Palette): BufferGeometry {
 	for (const side of [1, -1] as const) {
 		const s = section(1, side);
 		const centre: Vec3 = [0, sheer(1), HALF];
-		builder.tri(centre, s[0]!, s[1]!, palette.accent);
+		builder.tri(centre, s[0]!, s[1]!, palette.stripe);
 		builder.tri(centre, s[1]!, s[2]!, palette.hull);
 		builder.tri(centre, s[2]!, s[3]!, palette.hull);
 	}
@@ -105,9 +106,9 @@ export function hullGeometry(palette: Palette): BufferGeometry {
 	const roof = corners(roofY, 0.1, 0.45);
 	for (let i = 0; i < 4; i++) {
 		const j = (i + 1) % 4;
-		builder.quad(base[i]!, base[j]!, roof[j]!, roof[i]!, palette.hull);
+		builder.quad(base[i]!, base[j]!, roof[j]!, roof[i]!, palette.stripe);
 	}
-	builder.quad(roof[0]!, roof[1]!, roof[2]!, roof[3]!, palette.hull);
+	builder.quad(roof[0]!, roof[1]!, roof[2]!, roof[3]!, palette.stripe);
 	for (const side of [1, -1]) {
 		builder.quad(
 			[side * 0.665, deckY + 0.14, front + 0.5],
@@ -120,35 +121,44 @@ export function hullGeometry(palette: Palette): BufferGeometry {
 	// Cockpit well and its coamings.
 	builder.quad([-0.5, deckY + 0.03, 0.6], [0.5, deckY + 0.03, 0.6], [0.44, deckY + 0.03, 2.45], [-0.44, deckY + 0.03, 2.45], palette.deck);
 	for (const side of [1, -1]) {
-		builder.box([side * 0.5 - 0.05, deckY, 0.55], [side * 0.5 + 0.05, deckY + 0.2, 2.5], palette.hull);
+		builder.box([side * 0.5 - 0.05, deckY, 0.55], [side * 0.5 + 0.05, deckY + 0.2, 2.5], palette.stripe);
 	}
 	// Mast with spreaders, and a bow pulpit post so the stem reads at a glance.
-	builder.tube([0, RIG.mastFoot, RIG.mastZ], [0, RIG.mastTop, RIG.mastZ], 0.1, palette.deck, 6, 0.055);
-	builder.tube([-0.55, 5.6, RIG.mastZ], [0.55, 5.6, RIG.mastZ], 0.035, palette.deck, 4);
-	builder.tube([0, RIG.tackY - 0.1, RIG.tackZ], [0, RIG.tackY + 0.25, RIG.tackZ], 0.045, palette.deck, 4);
+	builder.tube([0, RIG.mastFoot, RIG.mastZ], [0, RIG.mastTop, RIG.mastZ], 0.1, palette.spar, 6, 0.055);
+	builder.tube([-0.55, 5.6, RIG.mastZ], [0.55, 5.6, RIG.mastZ], 0.035, palette.spar, 4);
+	builder.tube([0, RIG.tackY - 0.1, RIG.tackZ], [0, RIG.tackY + 0.25, RIG.tackZ], 0.045, palette.spar, 4);
+	// Stainless pulpit rail round the bow, a crisp line against the water.
+	builder.tube([-0.55, 1.35, -2.1], [0, 1.35, -HALF + 0.15], 0.03, palette.spar, 4);
+	builder.tube([0.55, 1.35, -2.1], [0, 1.35, -HALF + 0.15], 0.03, palette.spar, 4);
 	return builder.build();
 }
 
 /** Rudder blade and tiller, pivoting at the transom. */
 export function rudderGeometry(palette: Palette): BufferGeometry {
 	const builder = new MeshBuilder();
-	builder.box([-0.04, -0.75, -0.02], [0.04, 0.85, 0.34], palette.deck);
+	builder.box([-0.04, -0.75, -0.02], [0.04, 0.85, 0.34], palette.hull);
 	builder.tube([0, 0.95, 0.05], [0, 1.08, -1.25], 0.04, palette.deck, 4);
 	return builder.build();
 }
 
 /** The boom, in the mainsail pivot's frame: it runs aft along +Z. */
 export function boomGeometry(palette: Palette): BufferGeometry {
-	return new MeshBuilder().tube([0, 0, -0.1], [0, 0, RIG.boomLength], 0.07, palette.deck, 5, 0.05).build();
+	return new MeshBuilder().tube([0, 0, -0.1], [0, 0, RIG.boomLength], 0.07, palette.spar, 5, 0.05).build();
 }
 
-/** A small helmsman: enough to give the boat a sense of scale and life. */
+/** One sailor in a bright spray jacket, cap and dark shorts, sitting on the side deck. */
+function addSailor(builder: MeshBuilder, palette: Palette, z: number, jacket: Color, cap: Color): void {
+	builder.box([-0.21, 0, z - 0.17], [0.21, 0.55, z + 0.17], jacket);
+	builder.box([-0.23, -0.12, z - 0.2], [0.23, 0.04, z + 0.32], palette.glass);
+	builder.add(new IcosahedronGeometry(0.18, 1), place([0, 0.74, z]), palette.plank);
+	builder.box([-0.19, 0.8, z - 0.19], [0.19, 0.88, z + 0.26], cap);
+}
+
+/** The helmsman aft and a trimmer amidships: scale and life on deck. */
 export function crewGeometry(palette: Palette): BufferGeometry {
 	const builder = new MeshBuilder();
-	builder.box([-0.2, 0, -0.17], [0.2, 0.52, 0.17], palette.crew);
-	builder.box([-0.22, -0.12, -0.2], [0.22, 0.04, 0.3], palette.glass);
-	builder.add(new IcosahedronGeometry(0.17, 0), place([0, 0.72, 0]), palette.plank);
-	builder.box([-0.19, 0.76, -0.19], [0.19, 0.84, 0.24], palette.accent);
+	addSailor(builder, palette, 0, palette.crew, palette.accent);
+	addSailor(builder, palette, -1.25, palette.accent, palette.stripe);
 	return builder.build();
 }
 

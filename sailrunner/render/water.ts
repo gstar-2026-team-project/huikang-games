@@ -1,13 +1,12 @@
-import { BufferGeometry, Float32BufferAttribute, Group, Mesh, ShaderMaterial, Vector3 } from "three";
+import { BufferGeometry, Float32BufferAttribute, Group, Mesh, ShaderMaterial } from "three";
+import { SHOAL_COUNT, shoalUniforms } from "./islands";
 import type { Palette } from "./palette";
+import { SKY_GLSL, SUN_LIGHT, skyUniforms } from "./sun";
 import { SWELL_GLSL, setSwell, SWELL_MAX, swellUniforms } from "./swell";
 
 /** Distance fog shared by the water shader and the scene's built-in fog. */
-export const FOG_NEAR = 220;
-export const FOG_FAR = 1000;
-
-/** World-space direction towards the sun (unit length). */
-export const SUN_DIRECTION = new Vector3(-0.46, 0.4, -0.79).normalize();
+export const FOG_NEAR = 240;
+export const FOG_FAR = 1050;
 
 /** The water mesh: rings of vertices around the camera, close together near it and spread out far away. */
 const SPOKES = 120;
@@ -47,12 +46,20 @@ function polarGrid(): BufferGeometry {
 
 const VERTEX = /* glsl */ `
 ${SWELL_GLSL}
+uniform vec3 uShoals[${SHOAL_COUNT}];
 varying vec3 vWorld;
 varying vec3 vNormal;
 varying float vCrest;
+varying float vShallow;
 void main() {
 	vec4 world = modelMatrix * vec4(position, 1.0);
 	float dist = distance(world.xz, cameraPosition.xz);
+	// Shallows: turquoise water shoaling up to each island's beach.
+	float shore = 1e4;
+	for (int i = 0; i < ${SHOAL_COUNT}; i++) {
+		if (uShoals[i].z > 0.0) shore = min(shore, distance(world.xz, uShoals[i].xy) - uShoals[i].z);
+	}
+	vShallow = 1.0 - smoothstep(0.0, 120.0, shore);
 	vec3 normal;
 	vec3 offset = swellSurface(world.xz, dist, normal);
 	world.xyz += offset;
@@ -62,24 +69,28 @@ void main() {
 	gl_Position = projectionMatrix * viewMatrix * world;
 }`;
 
-// Shading: the swell's normal plus fine ripples too small for the mesh, a
-// deep body colour lit through the crests, sky reflected at grazing angles,
-// sun glitter, and foam where crests stand highest.
+// Shading: the swell's normal plus fine ripples too small for the mesh; a
+// saturated body colour, turquoise in the shallows and where low sun shines
+// through a crest; the sky's own gradient reflected at grazing angles; a
+// glitter path under the sun; crisp whitecaps; and haze that melts into the
+// horizon colour behind it.
 const FRAGMENT = /* glsl */ `
+${SKY_GLSL}
 uniform float uSwellTime;
 uniform vec2 uSwellWind;
 uniform vec3 uDeep;
 uniform vec3 uSea;
-uniform vec3 uHaze;
-uniform vec3 uSun;
+uniform vec3 uShallow;
+uniform vec3 uSand;
 uniform vec3 uFoam;
-uniform vec3 uSunDir;
+uniform vec3 uLightDir;
 uniform float uFogNear;
 uniform float uFogFar;
 uniform float uSwellMax;
 varying vec3 vWorld;
 varying vec3 vNormal;
 varying float vCrest;
+varying float vShallow;
 
 // Slope of one ripple train (fragment-only detail): wavenumber k, angular speed w.
 vec2 ripple(vec2 p, vec2 dir, float k, float w, float amp, float phase) {
@@ -95,7 +106,7 @@ void main() {
 	// Three ripple trains at unrelated lengths (5.3, 3.1, 1.9 m) and angles, so they
 	// never line up into a regular weave; they fade out before they would alias,
 	// and are not computed at all beyond that.
-	float near = 1.0 - smoothstep(12.0, 55.0, dist);
+	float near = 1.0 - smoothstep(14.0, 70.0, dist);
 	vec3 normal = vNormal;
 	if (near > 0.0) {
 		vec2 slope = ripple(vWorld.xz, normalize(uSwellWind + across * 0.31), 1.1855, 3.4102, 0.035, 0.0)
@@ -105,31 +116,38 @@ void main() {
 	}
 
 	float crest = clamp(vCrest / uSwellMax, -1.0, 1.0);
-	// Deep and saturated underfoot, paler towards the horizon; crests lit through.
-	vec3 body = mix(uDeep, uSea, smoothstep(10.0, 180.0, dist));
-	body = mix(body, uSea * 1.18, smoothstep(0.2, 0.9, crest) * 0.45);
-	float lambert = max(dot(normal, uSunDir), 0.0);
-	vec3 color = body * (0.72 + 0.4 * lambert);
+	// Deep and saturated underfoot, a touch lighter towards the horizon.
+	vec3 body = mix(uDeep, uSea, smoothstep(8.0, 240.0, dist));
+	body = mix(body, uShallow, vShallow * 0.85);
+	body = mix(body, uSand, smoothstep(0.82, 1.0, vShallow) * 0.35);
+	// Low sun through the thin top of a crest: it glows turquoise.
+	float backlit = max(dot(-view.xz, normalize(uSunDir.xz)), 0.0);
+	body = mix(body, uShallow * 1.1, smoothstep(0.25, 0.95, crest) * (0.15 + 0.4 * backlit) * (1.0 - vShallow));
+	float lambert = max(dot(normal, uLightDir), 0.0);
+	vec3 color = body * (0.7 + 0.45 * lambert);
 
-	// Sky reflected at grazing angles (Schlick), strongest towards the horizon.
+	// The sky itself reflected at grazing angles (Schlick): warm towards the sun, blue overhead.
+	vec3 mirror = reflect(-view, normal);
+	mirror.y = max(mirror.y, 0.01);
 	float cosV = max(dot(normal, view), 0.0);
 	float fresnel = 0.02 + 0.98 * pow(1.0 - cosV, 5.0);
-	color = mix(color, uHaze, clamp(fresnel * 0.75, 0.0, 0.6));
+	color = mix(color, skyColor(normalize(mirror)), clamp(fresnel * 0.9, 0.0, 0.72));
 
-	// Sun: a sharp glint on each wave face and a broad sheen on the path below the sun.
-	vec3 mirror = reflect(-view, normal);
-	float glint = pow(max(dot(mirror, uSunDir), 0.0), 260.0) * 2.2;
-	float sheen = pow(max(dot(mirror, uSunDir), 0.0), 24.0) * 0.16;
+	// Sun: crisp glints on each wave face, and a broad warm path below the sun.
+	float toSun = max(dot(mirror, uSunDir), 0.0);
+	float glint = pow(toSun, 420.0) * 3.2 * uSunDisc;
+	float sheen = pow(toSun, 28.0) * 0.32;
 	// Underfoot a single wave face fills a patch of screen: keep its glare soft there.
-	color += uSun * (glint + sheen) * smoothstep(10.0, 60.0, dist);
+	float glare = smoothstep(8.0, 50.0, dist);
+	color += (uSun * glint + uSunGlow * sheen) * glare;
 
-	// Whitecaps break on the highest, steepest crests, in streaks along the wind.
+	// Whitecaps break on the highest crests, in crisp streaks along the wind.
 	float streak = 0.5 + 0.5 * sin(dot(vWorld.xz, across) * 0.9 + sin(dot(vWorld.xz, uSwellWind) * 0.35) * 2.0);
-	float foam = smoothstep(0.62, 0.95, crest) * smoothstep(0.35, 0.9, streak) * (1.0 - smoothstep(120.0, 300.0, dist));
-	color = mix(color, uFoam, foam * 0.75);
+	float foam = smoothstep(0.66, 0.78, crest) * smoothstep(0.5, 0.7, streak) * (1.0 - smoothstep(140.0, 320.0, dist));
+	color = mix(color, uFoam, foam * 0.92);
 
 	float fog = clamp((dist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
-	gl_FragColor = vec4(mix(color, uHaze, fog), 1.0);
+	gl_FragColor = vec4(mix(color, horizonColor(-view), fog * fog * (3.0 - 2.0 * fog)), 1.0);
 	#include <colorspace_fragment>
 }`;
 
@@ -145,12 +163,14 @@ export class Sea {
 			fragmentShader: FRAGMENT,
 			uniforms: {
 				...swellUniforms,
+				...skyUniforms,
+				...shoalUniforms,
 				uDeep: { value: palette.seaDeep },
 				uSea: { value: palette.sea },
-				uHaze: { value: palette.sky },
-				uSun: { value: palette.sun },
+				uShallow: { value: palette.seaShallow },
+				uSand: { value: palette.sand },
 				uFoam: { value: palette.fleck },
-				uSunDir: { value: SUN_DIRECTION },
+				uLightDir: { value: SUN_LIGHT },
 				uFogNear: { value: FOG_NEAR },
 				uFogFar: { value: FOG_FAR },
 				uSwellMax: { value: SWELL_MAX },
@@ -166,8 +186,8 @@ export class Sea {
 		const uniforms = this.material.uniforms;
 		uniforms["uDeep"]!.value = palette.seaDeep;
 		uniforms["uSea"]!.value = palette.sea;
-		uniforms["uHaze"]!.value = palette.sky;
-		uniforms["uSun"]!.value = palette.sun;
+		uniforms["uShallow"]!.value = palette.seaShallow;
+		uniforms["uSand"]!.value = palette.sand;
 		uniforms["uFoam"]!.value = palette.fleck;
 	}
 

@@ -16,29 +16,43 @@
 		/* Controls stay clear of the native back-swipe bands at both edges. */
 		--edge: calc(24px + 8px);
 
-		/* World palette — the renderer reads these. */
-		--world-sky: #cfeaf6;
-		--world-sky-top: #4a9cd6;
-		--world-sun: #fff0c4;
-		--world-cloud: #ffffff;
-		--world-island: #8fb3b8;
-		--world-light-key: #fff1d8;
-		--world-light-fill: #bcdcff;
-		--world-sea: #2f8fb8;
-		--world-sea-deep: #176a9c;
-		--world-shadow: #0b3550;
-		--world-plank: #e3c08a;
-		--world-glass: #27475c;
-		--world-crew: #ffb02e;
-		--world-fleck: #e6f6ff;
-		--world-hull: #f4f1ea;
-		--world-deck: #6b4a2f;
-		--world-sail: #fffdf6;
-		--world-accent: #e2513a;
-		--world-buoy: #f2c230;
-		--world-buoy-next: #ff7a1a;
-		--world-buoy-done: #8fa6b2;
-		--world-finish: #2fbf71;
+		/* World palette — the renderer reads these. Late afternoon off a Mediterranean island. */
+		--world-night: 0;
+		--world-sky: #a9d6ef;
+		--world-sky-top: #2368c9;
+		--world-sky-glow: #ffc58c;
+		--world-sun: #fff4d6;
+		--world-sun-glow: #ffb361;
+		--world-cloud: #fff3e0;
+		--world-cloud-shade: #93a6d4;
+		--world-scrub: #5f9d34;
+		--world-rock: #ecbd88;
+		--world-sand: #f7e6bd;
+		--world-house: #fffaf0;
+		--world-roof: #d8663e;
+		--world-dome: #2f6fd0;
+		--world-lamp: #ffd27a;
+		--world-light-key: #ffd59a;
+		--world-light-fill: #a3c0f2;
+		--world-rim: #ffbf73;
+		--world-sea: #138cb8;
+		--world-sea-deep: #075a93;
+		--world-sea-shallow: #2fd6c8;
+		--world-shadow: #042c4c;
+		--world-plank: #c99461;
+		--world-glass: #16273a;
+		--world-crew: #ffc21a;
+		--world-fleck: #f4fcff;
+		--world-hull: #183766;
+		--world-stripe: #ffffff;
+		--world-spar: #d3d9e2;
+		--world-deck: #7a5434;
+		--world-sail: #ffffff;
+		--world-accent: #ec4434;
+		--world-buoy: #f0c75a;
+		--world-buoy-next: #ff4f1a;
+		--world-buoy-done: #93a6b2;
+		--world-finish: #19c16a;
 		--world-wake: #ffffff;
 		--map-sea: rgba(20, 74, 104, 0.72);
 		--map-edge: rgba(255, 255, 255, 0.55);
@@ -61,30 +75,44 @@
 
 	@media (prefers-color-scheme: dark) {
 		:root {
-			/* Same hues, lower lightness: dim the world, don't invert it. */
-			--world-sky: #3d6276;
-			--world-sky-top: #173449;
-			--world-sun: #d6c79e;
-			--world-cloud: #8fa5b3;
-			--world-island: #35565f;
-			--world-light-key: #d9ccb6;
-			--world-light-fill: #7fa3c4;
-			--world-sea: #1b5877;
-			--world-sea-deep: #0e3f5e;
-			--world-shadow: #051a29;
-			--world-plank: #a88a5c;
-			--world-glass: #152a38;
-			--world-crew: #c98a26;
-			--world-fleck: #9fc4d6;
-			--world-hull: #cfcabd;
+			/* The same bay at blue hour: the sun just set, lamps coming on. */
+			--world-night: 1;
+			--world-sky: #3f5684;
+			--world-sky-top: #0d1a44;
+			--world-sky-glow: #e9845a;
+			--world-sun: #ffb07a;
+			--world-sun-glow: #e8704e;
+			--world-cloud: #c48a92;
+			--world-cloud-shade: #2e3b66;
+			--world-scrub: #2f4d3e;
+			--world-rock: #6e5f6c;
+			--world-sand: #8f8590;
+			--world-house: #b9bfd6;
+			--world-roof: #7d4a48;
+			--world-dome: #2a4a8a;
+			--world-lamp: #ffcf6e;
+			--world-light-key: #b49ccf;
+			--world-light-fill: #5a77bb;
+			--world-rim: #ff9468;
+			--world-sea: #0f4673;
+			--world-sea-deep: #061f45;
+			--world-sea-shallow: #19707e;
+			--world-shadow: #020d22;
+			--world-plank: #9a7e60;
+			--world-glass: #0c1626;
+			--world-crew: #e09a24;
+			--world-fleck: #c4d8ef;
+			--world-hull: #15294f;
+			--world-stripe: #dfe6f2;
+			--world-spar: #9aa3b4;
 			--world-deck: #4d3522;
-			--world-sail: #d8d4c8;
-			--world-accent: #b8432f;
-			--world-buoy: #c99f26;
-			--world-buoy-next: #d96614;
-			--world-buoy-done: #627884;
-			--world-finish: #24995a;
-			--world-wake: #c9dbe4;
+			--world-sail: #e4e8f2;
+			--world-accent: #d23e34;
+			--world-buoy: #b9a052;
+			--world-buoy-next: #ff5a22;
+			--world-buoy-done: #5a6b7c;
+			--world-finish: #1fae62;
+			--world-wake: #d2e0f0;
 			--map-sea: rgba(8, 30, 44, 0.78);
 			--map-edge: rgba(200, 225, 240, 0.4);
 			--map-boat: #e8f2f7;
@@ -207,6 +235,28 @@
 	font-weight: 700;
 	color: #fff;
 	text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+.mark-pointer {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 10px 3px 6px;
+	border-radius: 999px;
+	background: var(--buoy-next-chip, rgba(255, 122, 26, 0.92));
+	color: #fff;
+	font-size: 13px;
+	font-weight: 800;
+	font-variant-numeric: tabular-nums;
+	box-shadow: var(--shadow);
+}
+.mark-pointer[hidden] {
+	display: none;
+}
+.mark-pointer-arrow {
+	display: inline-block;
+	font-size: 14px;
+	line-height: 1;
+	transition: none;
 }
 .leader-chip {
 	display: inline-flex;

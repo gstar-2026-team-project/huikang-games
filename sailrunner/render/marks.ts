@@ -12,6 +12,7 @@ import {
 	MeshLambertMaterial,
 	PlaneGeometry,
 	RingGeometry,
+	SphereGeometry,
 } from "three";
 import type { Course } from "../game/course";
 import { markRadius } from "../game/race";
@@ -19,7 +20,10 @@ import { MeshBuilder, place } from "./mesh-builder";
 import type { Palette } from "./palette";
 import { rideSwell, swellHeightAt } from "./swell";
 
-const BUOY_SCALE = 1.15;
+const BUOY_SCALE = 1.1;
+/** The next mark is drawn bigger than the rest, and rounded ones smaller. */
+const NEXT_SCALE = 1.4;
+const DONE_SCALE = 0.85;
 /** Top of the finish pole, in buoy units. */
 const POLE_TOP = 8.4;
 const FLAG_WIDTH = 2.8;
@@ -36,22 +40,36 @@ interface MarkView {
 	painted: Color | null;
 }
 
-/** A striped channel buoy: float collar, banded body, and a lamp or flag pole. */
+/** An inflatable racing mark: dark float collar, tall coloured body with a white band, domed top. */
 function buoyGeometry(color: Color, palette: Palette, finish: boolean): BufferGeometry {
 	const builder = new MeshBuilder();
-	const sides = 10;
-	builder.add(new CylinderGeometry(1.5, 1.6, 0.6, sides), place([0, 0.15, 0]), color);
-	builder.add(new CylinderGeometry(1.08, 1.32, 0.95, sides), place([0, 0.92, 0]), color);
-	builder.add(new CylinderGeometry(0.86, 1.08, 0.75, sides), place([0, 1.77, 0]), palette.wake);
-	builder.add(new CylinderGeometry(0.6, 0.86, 0.85, sides), place([0, 2.57, 0]), color);
+	const sides = 14;
+	builder.add(new CylinderGeometry(1.45, 1.55, 0.5, sides), place([0, 0.1, 0]), palette.glass);
+	builder.add(new CylinderGeometry(1.2, 1.32, 1.5, sides), place([0, 1.1, 0]), color);
+	builder.add(new CylinderGeometry(1.14, 1.2, 0.7, sides), place([0, 2.2, 0]), palette.wake);
+	builder.add(new CylinderGeometry(1.02, 1.14, 1.3, sides), place([0, 3.2, 0]), color);
+	builder.add(new SphereGeometry(1.02, sides, 4, 0, Math.PI * 2, 0, Math.PI / 2), place([0, 3.85, 0], [1, 0.6, 1]), color);
 	if (finish) {
-		builder.tube([0, 2.9, 0], [0, POLE_TOP, 0], 0.1, palette.glass, 5, 0.07);
+		builder.tube([0, 4.2, 0], [0, POLE_TOP, 0], 0.1, palette.glass, 5, 0.07);
 		builder.add(new IcosahedronGeometry(0.2, 0), place([0, POLE_TOP + 0.1, 0]), palette.wake);
 	} else {
-		builder.add(new CylinderGeometry(0.2, 0.26, 0.75, 6), place([0, 3.35, 0]), palette.glass);
-		builder.add(new IcosahedronGeometry(0.45, 0), place([0, 4, 0]), palette.wake);
+		builder.tube([0, 4.2, 0], [0, 5.6, 0], 0.07, palette.glass, 4);
+		builder.add(new IcosahedronGeometry(0.32, 0), place([0, 5.7, 0]), palette.wake);
 	}
 	return builder.build();
+}
+
+/** A tall shaft of light over the next mark: bright at the water, fading to nothing. */
+function beamGeometry(): BufferGeometry {
+	const geometry = new CylinderGeometry(0.35, 0.75, 60, 8, 1, true);
+	const position = geometry.getAttribute("position");
+	const colors: number[] = [];
+	for (let i = 0; i < position.count; i++) {
+		const up = (position.getY(i) + 30) / 60;
+		colors.push(1, 1, 1, (1 - up) ** 2.2 * 0.42);
+	}
+	geometry.setAttribute("color", new Float32BufferAttribute(colors, 4));
+	return geometry;
 }
 
 /** Chequered finish flag flying towards +X from the pole. */
@@ -77,6 +95,8 @@ export class Marks {
 	private views: MarkView[] = [];
 	private palette: Palette;
 	private bodyMaterial = new MeshLambertMaterial({ vertexColors: true, side: DoubleSide });
+	/** The next mark glows a little from within so it reads even against the sun. */
+	private nextMaterial = new MeshLambertMaterial({ vertexColors: true, side: DoubleSide });
 	private flagMaterial = new MeshBasicMaterial({ vertexColors: true, side: DoubleSide });
 	private beaconMaterial: MeshBasicMaterial;
 	private pointerMaterial: MeshBasicMaterial;
@@ -87,16 +107,17 @@ export class Marks {
 		this.palette = palette;
 		this.beaconMaterial = new MeshBasicMaterial({
 			color: palette.buoyNext,
+			vertexColors: true,
 			transparent: true,
-			opacity: 0.3,
 			depthWrite: false,
 			side: DoubleSide,
 		});
 		this.pointerMaterial = new MeshBasicMaterial({ color: palette.buoyNext });
-		const beam = new Mesh(new CylinderGeometry(0.85, 0.4, 56, 8, 1, true), this.beaconMaterial);
-		beam.position.y = 42;
+		this.nextMaterial.emissive.copy(palette.buoyNext).multiplyScalar(0.2);
+		const beam = new Mesh(beamGeometry(), this.beaconMaterial);
+		beam.position.y = 34;
 		// A downward arrowhead hovering over the buoy: "this one next".
-		const head = new ConeGeometry(1.25, 2.4, 4);
+		const head = new ConeGeometry(1.7, 3.2, 4);
 		head.rotateX(Math.PI);
 		this.pointer = new Mesh(head, this.pointerMaterial);
 		this.beacon.add(beam, this.pointer);
@@ -128,7 +149,7 @@ export class Marks {
 				depthWrite: false,
 				side: DoubleSide,
 			});
-			const ringMesh = new Mesh(new RingGeometry(radius - 0.8, radius, 64), rideSwell(ring));
+			const ringMesh = new Mesh(new RingGeometry(radius - 1.1, radius, 64), rideSwell(ring));
 			ringMesh.rotation.x = -Math.PI / 2;
 			ringMesh.position.y = 0;
 			group.add(buoy, ringMesh);
@@ -138,7 +159,11 @@ export class Marks {
 	}
 
 	/** Colour marks by progress (rounded, next, upcoming, finish) and animate them. */
-	setProgress(nextIndex: number, timeSec: number, wind: number): void {
+	/**
+	 * `camera` (world x, z) fades the next mark's light shaft as you close in:
+	 * it is there to find the mark from afar, and would wall off the view up close.
+	 */
+	setProgress(nextIndex: number, timeSec: number, wind: number, camera?: { x: number; z: number }): void {
 		const last = this.views.length - 1;
 		this.beacon.visible = false;
 		this.views.forEach((view, index) => {
@@ -158,8 +183,11 @@ export class Marks {
 				view.body.geometry = buoyGeometry(color, this.palette, index === last);
 				view.painted = color;
 			}
+			view.body.material = next ? this.nextMaterial : this.bodyMaterial;
+			const scale = BUOY_SCALE * (next ? NEXT_SCALE : done ? DONE_SCALE : 1);
+			view.buoy.scale.setScalar(scale);
 			view.ring.color.copy(color);
-			view.ring.opacity = next ? 0.72 + 0.22 * Math.sin(timeSec * 3) : done ? 0.16 : 0.34;
+			view.ring.opacity = next ? 0.78 + 0.2 * Math.sin(timeSec * 3) : done ? 0.1 : 0.24;
 
 			// Float on the swell, tipping with its slope.
 			const { x: mx, z: mz } = view.group.position;
@@ -173,8 +201,10 @@ export class Marks {
 			}
 			if (next) {
 				this.beacon.visible = true;
+				const near = camera ? Math.hypot(camera.x - view.group.position.x, camera.z - view.group.position.z) : 999;
+				this.beaconMaterial.opacity = Math.min(1, Math.max(0, (near - 35) / 70));
 				this.beacon.position.copy(view.group.position);
-				this.pointer.position.y = (index === last ? 13 : 8.6) + Math.sin(timeSec * 2.6) * 0.5;
+				this.pointer.position.y = (index === last ? 14 : 11) + Math.sin(timeSec * 2.6) * 0.6;
 				this.pointer.rotation.y = timeSec * 1.2;
 			}
 		});
@@ -184,6 +214,7 @@ export class Marks {
 		this.palette = palette;
 		this.beaconMaterial.color.copy(palette.buoyNext);
 		this.pointerMaterial.color.copy(palette.buoyNext);
+		this.nextMaterial.emissive.copy(palette.buoyNext).multiplyScalar(0.2);
 		for (const view of this.views) {
 			// Force a repaint with the new scheme's colours on the next frame.
 			view.painted = null;
@@ -211,7 +242,7 @@ export class Marks {
 		this.beacon.traverse((node) => {
 			if (node instanceof Mesh) node.geometry.dispose();
 		});
-		for (const material of [this.bodyMaterial, this.flagMaterial, this.beaconMaterial, this.pointerMaterial]) {
+		for (const material of [this.bodyMaterial, this.nextMaterial, this.flagMaterial, this.beaconMaterial, this.pointerMaterial]) {
 			material.dispose();
 		}
 	}
