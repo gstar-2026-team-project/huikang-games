@@ -13,6 +13,86 @@ build on GitHub Pages. A change is done when it is tested, played, committed to
 Root `AGENTS.md` holds the standing rules (commit to `main`, publish without
 asking). This skill is the order of work and the traps.
 
+## 0. What the owner has complained about (read every time)
+
+Each of these was a real complaint. Do not repeat them.
+
+**Ownership and judgment**
+- **"Don't you have taste?" / "ask me for what improve it???" / "wtf".** Do
+  not hand design decisions back as a menu. Decide, using taste, and keep
+  improving until a human would not complain. Ask only when the answer truly
+  changes direction (for example which game, or a deliberate rule change).
+- **"Did you even try?" / "did you actually play it?"** A bot reading the
+  game's internal state and pressing keys is not playing. Before claiming a
+  game is good, steer it **by sight**: screenshot, decide from the pixels,
+  press, look again, with no probe or internals. Report honestly what a person
+  would struggle with.
+- **"The game is still shit."** Passing tests and tidy screenshots prove
+  nothing about fun or clarity. Judge it as a player would.
+- **Misreading the request.** "Wind on the map" meant the map; "arrows on the
+  water" meant arrows on the water moving with the real wind. Restate the
+  request in one line before building when it is ambiguous, and never remove
+  something the owner asked for.
+- **Stopping to argue with an open goal.** When given an open-ended goal, keep
+  making concrete improvements; do not stop and debate whether it is met.
+- **Commit and push as you go.** Each finished, verified change is committed,
+  pushed and published (Pages and Joiner) without being asked.
+
+**Motion and feel**
+- **"Initial screen is laggy" → "in the home screen it stalled".** Idle screens
+  drawn at 4 fps look laggy; freezing them looks hung. The home screen is the
+  first impression: animate it at full rate. Only true pause/game-over panels
+  may idle.
+- **"Too laggy."** Measure on real hardware, not only the headless CPU browser
+  at phone size: launch Chrome headful with a GPU at the user's screen size
+  (`deviceScaleFactor: 2`, 1280×800 or larger) and read real frame times. Big
+  per-pixel shaders on retina screens are the usual cause; keep a dynamic
+  resolution fallback. Also measure input-to-response (key press to visible
+  turn).
+- **"Why can't you test this frame by frame???"** Motion is checked with
+  Playwright's fake clock (section 5), never with loose screenshots.
+- **"The arrow movement is funny" / "arrows should travel the real
+  direction".** Things on the water belong to the water: they drift with the
+  wind relative to the sea, not relative to the boat or camera. With the boat
+  stopped they must move exactly the way they point. Prove it with a unit test
+  and a frame-by-frame film with the boat stopped.
+
+**Look**
+- **"Graphics are uninspiring" / "can you build better graphics?"** Aim for a
+  stylised, saturated, art-directed look (strong light, sky gradient, depth,
+  life: birds, spray, distant boats), never flat single colours. Compare before
+  and after shots and iterate until it would go on an app store page.
+- **"Could you have more realistic waves?"** Real moving swell (Gerstner,
+  deep-water speeds), whitecaps on crests, objects floating on it.
+- **Wide screens.** Check 1920 px wide: a sky band once stopped short and left a
+  solid slab on desktop.
+- **Text over the scene** must stay readable over pale sky and clouds (pills,
+  edges, shadows).
+
+**Realism and rules**
+- **"Could you study how sailing works?"** Research the real activity before
+  building its physics, and compare point by point (polar, no-go zone, gybing
+  downwind, steerage, momentum, leeway).
+- **"Stop having over/under speed requirements."** Remove arbitrary rules the
+  owner dislikes outright, everywhere (rules, rendering, HUD, copy, tests).
+- **"Start with max thrust"; "no need to countdown".** Prefer getting the
+  player into the action immediately.
+- **"The game doesn't make sense at all" (Cloudrunner).** A new game must make
+  its core loop legible in the first ten seconds: show the thing to react to,
+  give continuous feedback, and one line of guidance.
+
+**Navigation**
+- When steering by sight, the next target was often off screen and a later
+  buoy looked like the target. Always show the next goal (edge arrow or pointer
+  with distance) and mute everything that is not the next goal.
+
+**Tools**
+- **"Could you use puppeteer to play" / "install puppeteer mcp??"** Puppeteer
+  MCP and Chrome automation are available; use them to play, and say so instead
+  of asking.
+- **"Read the docs and connect to joiner."** Follow the docs end to end
+  (install, login, publish) without stalling.
+
 ## 1. Set up the machine (once)
 
 - Bun 1.x and Node 22.22+ are required. If the `curl | bash` Bun installer is
