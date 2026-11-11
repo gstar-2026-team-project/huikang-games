@@ -78,7 +78,7 @@ test("repeating a finish, or a checkpoint arriving late, changes nothing", async
 	}
 });
 
-test("a lower score never replaces a best, and a flight with no turnpoints posts no score", async () => {
+test("a lower score never replaces a best, and a flight with no beacons posts no score", async () => {
 	const { harness, alice } = await setup();
 	try {
 		await (await alice.mutate.startRun({ runId: "a", seed: 1, startedAt: 1 })).confirmed;
@@ -142,7 +142,7 @@ test("everyone flies the same daily task, and their best lands on that day's boa
 	}
 });
 
-test("the daily board ranks turnpoints first, then the faster time, and keeps each pilot's best", async () => {
+test("the daily board ranks beacons first, then the faster time, and keeps each pilot's best", async () => {
 	const { harness, alice, bob } = await setup();
 	try {
 		const fly = async (who: typeof alice, id: string, turnpoints: number, seconds: number) => {
@@ -155,7 +155,7 @@ test("the daily board ranks turnpoints first, then the faster time, and keeps ea
 		await waitUntil(async () => (await alice.query(readView(DAY))).daily.length === 2);
 		const first = await alice.query(dailyBoard);
 		expect(first.entries.map((e) => e.userId)).toEqual(["bob", "alice"]);
-		expect(first.entries[0]?.displayScore).toBe("4 turnpoints · 171.9 s");
+		expect(first.entries[0]?.displayScore).toBe("4 beacons · 171.9 s");
 		expect((await alice.query(readView(DAY))).daily).toContainEqual({ userId: "alice", score: 4, seconds: 182.4 });
 		// Same turnpoints, faster: alice takes the lead.
 		await fly(alice, "a3", 4, 160);

@@ -32,15 +32,18 @@ test("opens on the mode menu, shows the daily score to beat, and launches the da
 		const q = (id: string) => container.querySelector<HTMLElement>(`[data-testid=${id}]`);
 		await waitFor(() => expect(q("mode-daily")).not.toBeNull());
 		expect(container.dataset.screen).toBe("home");
-		expect(q("mode-daily")).toHaveTextContent("4 turnpoints, fastest wins");
-		expect(q("mode-free")).toHaveTextContent("Endless turnpoints");
+		expect(q("mode-daily")).toHaveTextContent("4 beacons, fastest wins");
+		expect(q("mode-free")).toHaveTextContent("Endless beacons");
 		expect(container.querySelector("#pText")).toHaveTextContent("rising air is your only way up");
 		// A three-step how-to: find the rising air, circle in it, glide on to the beacon.
 		const steps = [...container.querySelectorAll("[data-testid=how-to] li")].map((li) => li.textContent);
 		expect(steps).toHaveLength(3);
-		expect(steps[0]).toContain("Fly to a cloud");
-		expect(steps[1]).toContain("hold a turn");
-		expect(steps[2]).toContain("beacon");
+		expect(steps[0]).toContain("white columns under clouds");
+		expect(steps[1]).toContain("Circle inside it to climb");
+		expect(steps[2]).toContain("striped beacon");
+		// Each step carries the colour it means in the scene: cyan lift, green climb, red beacon.
+		const swatches = [...container.querySelectorAll("[data-testid=how-to] .swatch")].map((s) => s.className);
+		expect(swatches).toEqual(["swatch lift", "swatch climb", "swatch beacon"]);
 		// No daily scores yet: no leaderboard layer at all.
 		expect(q("rival")?.hidden).toBe(true);
 
@@ -68,8 +71,11 @@ test("opens on the mode menu, shows the daily score to beat, and launches the da
 		expect(probe?.thermals.length).toBeGreaterThan(0);
 		expect(q("turnpoints")).toHaveTextContent("0");
 		expect(probe?.vario).toBeLessThan(0);
-		// The flight shows its variometer, the menu is gone, and the sound can be switched off.
+		// The flight shows its climb meter and the two pointer chips, the menu is gone, and the sound can be switched off.
 		expect(q("vario-box")).not.toBeNull();
+		expect(q("vario-box")?.getAttribute("aria-label")).toBe("Climb meter");
+		expect(q("beacon-pointer")).not.toBeNull();
+		expect(q("lift-pointer")).not.toBeNull();
 		expect(q("overlay")?.hidden).toBe(true);
 		expect(q("mute")).toHaveTextContent("Sound on");
 		q("mute")?.click();

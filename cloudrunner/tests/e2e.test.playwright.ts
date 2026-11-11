@@ -62,7 +62,7 @@ test.describe("cloudrunner", () => {
 			await expect(a.frame.locator("#root")).toHaveAttribute("data-screen", "over", { timeout: 30_000 });
 			await a.page.keyboard.up("ArrowDown");
 			await expect(a.frame.locator("#pTitle")).toHaveText("Landed out");
-			await expect(a.frame.locator("#pText")).toContainText("best 1 turnpoint");
+			await expect(a.frame.locator("#pText")).toContainText("best 1 beacon");
 
 			const rival = sessions.bob.frame.locator("[data-testid=rival]");
 			await expect(rival).toBeVisible({ timeout: 10_000 });

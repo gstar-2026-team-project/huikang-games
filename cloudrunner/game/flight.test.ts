@@ -131,7 +131,7 @@ test("rising air carries the glider up, and the variometer shows it", () => {
 	expect(out.vario).toBeLessThan(-3);
 });
 
-test("a turnpoint counts once, at any height, the moment the glider is within its radius", () => {
+test("a beacon counts once, at any height, the moment the glider is within its radius", () => {
 	const sim = createSim(3, DAILY);
 	const tp = sim.turnpoints[0]!;
 	const events: SimEvent[] = [];
@@ -155,7 +155,7 @@ test("a turnpoint counts once, at any height, the moment the glider is within it
 	}
 });
 
-test("the daily task ends on its last turnpoint; free flight just lays out more", () => {
+test("the daily task ends on its last beacon; free flight just lays out more", () => {
 	const daily = createSim(3, DAILY);
 	const events: SimEvent[] = [];
 	for (const tp of daily.turnpoints) {

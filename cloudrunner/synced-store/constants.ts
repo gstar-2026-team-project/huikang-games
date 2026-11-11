@@ -1,8 +1,8 @@
 // Plain constants shared by mutators and UI. No SDK or zod imports.
 /** Free-flight board: most turnpoints reached before landing out. */
 export const LEADERBOARD_ID = "most-turnpoints";
-export const LEADERBOARD_LABEL = "Most turnpoints in one flight";
-export const TURNPOINT_UNIT = { singular: "turnpoint", plural: "turnpoints" } as const;
+export const LEADERBOARD_LABEL = "Most beacons in one flight";
+export const TURNPOINT_UNIT = { singular: "beacon", plural: "beacons" } as const;
 /** Largest turnpoint count a single flight can plausibly report. */
 export const MAX_TURNPOINTS_PER_RUN = 10_000;
 export const RUN_END_REASONS = ["ground", "time", "interrupted", "complete"] as const;

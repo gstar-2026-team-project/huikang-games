@@ -1,5 +1,5 @@
 import { createSim, groundBelow, NO_CONTROLS, type Sim, type SimEvent, stepSim } from "../game/flight";
-import { DAILY, daySeed, FREE, turnpointsText } from "../game/modes";
+import { DAILY, daySeed, FREE, beaconsText } from "../game/modes";
 import { thermalsNear } from "../game/thermals";
 import { dailyBoardId, LEADERBOARD_ID, type RunEndReason } from "../synced-store/constants";
 import type { BoardEntryView, StoreView } from "../synced-store/data/view";
@@ -155,6 +155,7 @@ export class FlightController {
 			day: this.today(),
 			dailyBest: mine ? { turnpoints: mine.score, seconds: mine.seconds ?? 0 } : null,
 			freeBest: v?.pilot?.best ?? 0,
+			keyboard: hasKeyboard(),
 		}));
 	}
 
@@ -203,6 +204,11 @@ export class FlightController {
 		if (this.sim.phase === "flying") {
 			const tip = this.coach.step(this.sim.vario, ctl.roll, dt);
 			if (tip) this.hud.tip(TIPS[tip]);
+			// The opening hint has done its job once the glider climbs; don't let it talk over the tips.
+			if (this.hintShown && this.sim.vario > 0.5) {
+				this.hintShown = false;
+				this.ui.hint.hidden = true;
+			}
 		}
 		if (this.sim.next !== before) this.checkOvertakes(before, this.sim.next);
 		for (const e of this.events) this.handle(e);
@@ -214,7 +220,7 @@ export class FlightController {
 		switch (e.kind) {
 			case "turnpoint": {
 				const total = this.sim.spec.count;
-				this.hud.toast(total === null ? turnpointsText(this.sim.next) : `Turnpoint ${this.sim.next} of ${total}`);
+				this.hud.toast(`✓ ${total === null ? beaconsText(this.sim.next) : `Beacon ${this.sim.next} of ${total}`}`);
 				haptics.impact("light");
 				if (this.runId) {
 					this.call(this.props.store.mutate.reachTurnpoint({ runId: this.runId, turnpoints: this.sim.next }, { pendingMutationDedupeKey: "turnpoint-checkpoint" }));
@@ -335,6 +341,11 @@ export class FlightController {
 		this.clearEndTimer();
 		delete window.__cloudrunnerProbe;
 	}
+}
+
+/** A desktop-style device: a mouse or trackpad that can hover, so most likely a keyboard too. */
+function hasKeyboard(): boolean {
+	return typeof window.matchMedia === "function" && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 }
 
 /** Best of today's saved daily entry and this flight: more turnpoints, then sooner. */

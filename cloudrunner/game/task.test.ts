@@ -59,14 +59,14 @@ test("the launch is clear of the hills, but far too low to glide the whole task"
 	}
 });
 
-test("the daily score ranks turnpoints first, then the faster time", () => {
+test("the daily score ranks beacons first, then the faster time", () => {
 	expect(dailyScore(3, 250)).toBeGreaterThan(dailyScore(2, 10));
 	expect(dailyScore(4, 150.3)).toBeGreaterThan(dailyScore(4, 150.4));
 	expect(dailyScore(1, 0)).toBeLessThan(dailyScore(2, DAILY_SECONDS));
 	expect(decodeDailyScore(dailyScore(3, 142.5))).toEqual({ turnpoints: 3, seconds: 142.5 });
 	expect(decodeDailyScore(dailyScore(4, 9999))).toEqual({ turnpoints: 4, seconds: DAILY_SECONDS });
-	expect(dailyDisplay(3, 142.5)).toBe("3 turnpoints · 142.5 s");
-	expect(dailyDisplay(1, 20)).toBe("1 turnpoint · 20.0 s");
+	expect(dailyDisplay(3, 142.5)).toBe("3 beacons · 142.5 s");
+	expect(dailyDisplay(1, 20)).toBe("1 beacon · 20.0 s");
 });
 
 test("the daily seed depends only on the UTC date", () => {

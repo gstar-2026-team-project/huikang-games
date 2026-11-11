@@ -1,5 +1,6 @@
 import type { Sim } from "../game/flight";
 import { surfaceHeight } from "../game/terrain";
+import { IN_LIFT_SHARE } from "../game/guide";
 import { CLOUD_BASE, type Thermal, thermalsNear } from "../game/thermals";
 import type { Camera } from "./camera";
 import { NEAR } from "./camera";
@@ -13,15 +14,20 @@ export interface ColumnItem { kind: 3; z: number; th: Thermal; dist: number }
 
 /** Grid cells around the camera whose thermals are drawn: clouds read from further off than the hills. */
 const REACH = 3;
-/** Farther than this (m) a column is not drawn; its cloud still shows. */
-const COLUMN_RANGE = 3200;
-/** Within this range (m) the column carries rising motes. */
-const MOTE_RANGE = 1700;
-const MOTES = 56;
+/** Within this range (m) the column carries streaks rushing up it. */
+const STREAK_RANGE = 2600;
+const STREAKS = 42;
+/** Streaks in a band this tall (m) around the camera, when it is in or beside the column. */
+const LOCAL_SPAN = 260;
+const LOCAL_STREAKS = 40;
+const MAX_STREAK_PX = 46;
+/** Core lift (m/s) drawn as the densest, brightest column. */
+const FULL_STRENGTH = 17;
 /** Clouds are this many times wider than their thermal. */
 const CLOUD_SPREAD = 1.8;
-/** Farther than this (m) a cloud is lost in the haze. */
+/** Farther than this (m) a cloud, and the column under it, is lost in the haze. */
 const CLOUD_RANGE = 6000;
+const COLUMN_RANGE = CLOUD_RANGE;
 const tmp = [0, 0, 0];
 const top = [0, 0, 0];
 const ring = new Float32Array(17 * 3);
@@ -64,7 +70,7 @@ export function drawCloud(ctx: CanvasRenderingContext2D, cam: Camera, it: CloudI
 	const z = tmp[2] ?? 0;
 	// Fully opaque while the thermal lives; thins as it dies and as it fades into the far haze.
 	const haze = Math.max(0, (it.dist - CLOUD_RANGE * 0.7) / (CLOUD_RANGE * 0.3));
-	const alpha = Math.min(1, life * 1.6) * (1 - Math.min(1, haze));
+	const alpha = Math.min(1, life * 1.3) * (1 - Math.min(1, haze));
 	// Elevation of the cloud base from the camera: high overhead, show its underside.
 	const elev = Math.atan2(CLOUD_BASE - cam.y, Math.max(1, it.dist));
 	if (elev > 0.35) drawBase(ctx, cam, th, width * 0.45, alpha * Math.min(1, (elev - 0.35) * 3), pal);
@@ -105,72 +111,126 @@ function drawBase(ctx: CanvasRenderingContext2D, cam: Camera, th: Thermal, rad: 
 }
 
 /**
- * The rising air: a soft glowing column from the ground to the cloud, and
- * motes streaming up it, densest in the core and faster where the lift is
- * stronger. A dying thermal's column fades and its motes thin out.
+ * The rising air: a cool cyan column from the ground into the cloud, and
+ * streaks rushing up it, densest in the core. Stronger lift draws a denser,
+ * brighter column; a dying thermal's column fades with its cloud. `clock` is
+ * render time (s), so the streaks move on the menu too.
  */
-export function drawColumn(ctx: CanvasRenderingContext2D, cam: Camera, sim: Sim, it: ColumnItem, pal: Palette): void {
+export function drawColumn(ctx: CanvasRenderingContext2D, cam: Camera, sim: Sim, it: ColumnItem, pal: Palette, clock: number): void {
 	const th = it.th;
 	const floor = surfaceHeight(sim.terrain, th.x, th.z);
-	const strength = Math.min(1, th.strength / 12);
-	const fade = 1 - Math.min(1, it.dist / COLUMN_RANGE) ** 2;
-	// The glowing band, unless the camera is inside it (then the motes all around show the lift).
-	const inside = Math.max(0, Math.min(1, (it.dist - th.radius * 1.1) / (th.radius * 0.9)));
+	const power = Math.min(1, th.strength / FULL_STRENGTH);
+	const haze = Math.max(0, (it.dist - COLUMN_RANGE * 0.6) / (COLUMN_RANGE * 0.4));
+	const fade = 1 - Math.min(1, haze);
+	// Close by, a cyan ring on the ground marks where the lift is.
+	if (it.dist < RING_RANGE) liftRing(ctx, cam, th, floor + 2, th.radius * IN_LIFT_SHARE, th.life * (1 - it.dist / RING_RANGE) ** 0.5, pal);
+	// The band, unless the camera is inside it (then the streaks all around show the lift).
+	const inside = Math.max(0, Math.min(1, (it.dist - th.radius * IN_LIFT_SHARE) / (th.radius * 0.5)));
 	cam.point(th.x, floor, th.z, tmp);
 	cam.point(th.x, CLOUD_BASE, th.z, top);
 	const z0 = tmp[2] ?? 0, z1 = top[2] ?? 0;
 	if (inside > 0 && z0 > NEAR && z1 > NEAR) {
 		const bx = cam.sx(tmp), by = cam.sy(tmp), tx = cam.sx(top), ty = cam.sy(top);
 		const len = Math.hypot(tx - bx, ty - by);
-		const w = (th.radius * 1.5 * cam.F) / it.z;
+		const w = (th.radius * 1.25 * cam.F) / it.z;
 		if (len > 2 && w > 1) {
 			ctx.save();
-			ctx.globalAlpha = Math.min(1, 0.85 * th.life * (0.55 + 0.45 * strength) * fade * inside);
+			ctx.globalAlpha = Math.min(1, (0.25 + 0.75 * power) * fade * inside);
 			ctx.translate(bx, by);
 			ctx.rotate(Math.atan2(tx - bx, -(ty - by)));
-			ctx.drawImage(columnSprite(pal), -w / 2, -len, w, len);
+			ctx.drawImage(columnSprite(pal, false), -w / 2, -len, w, len);
+			// The chevrons only from further off: close up they would be huge.
+			const fadePx = cam.W * CHEVRON_FADE;
+			const up = Math.max(0, Math.min(1, (fadePx - w) / (fadePx * 0.5)));
+			if (up > 0.02) {
+				ctx.globalAlpha *= up;
+				ctx.drawImage(columnSprite(pal, true), -w / 2, -len, w, len);
+			}
 			ctx.restore();
 		}
 	}
-	if (it.dist > MOTE_RANGE) return;
-	drawMotes(ctx, cam, sim, th, floor, fade, pal);
+	if (it.dist > STREAK_RANGE) return;
+	const far = power * (1 - Math.min(1, it.dist / STREAK_RANGE) ** 2);
+	drawStreaks(ctx, cam, th, floor, CLOUD_BASE, STREAKS, far, pal, clock, 0);
+	// In or beside the column, a second set streams past at the glider's own height.
+	if (it.dist < th.radius * 1.2) {
+		const lo = Math.max(floor, cam.y - LOCAL_SPAN / 2);
+		drawStreaks(ctx, cam, th, lo, Math.min(CLOUD_BASE, lo + LOCAL_SPAN), LOCAL_STREAKS, power, pal, clock, 0x5a17);
+	}
 }
 
-const mote = [0, 0, 0];
+/** Columns wider than this share of the screen lose their chevrons. */
+const CHEVRON_FADE = 0.6;
+/** Within this range (m) a thermal also shows a ring on the ground around its lift. */
+const RING_RANGE = 2400;
+const RING_SEGMENTS = 24;
+const ringPts = new Float32Array((RING_SEGMENTS + 1) * 3);
 
-function drawMotes(ctx: CanvasRenderingContext2D, cam: Camera, sim: Sim, th: Thermal, floor: number, fade: number, pal: Palette): void {
-	const span = Math.max(50, CLOUD_BASE - floor);
-	const count = Math.round(MOTES * Math.min(1, th.life * 1.2));
-	const rise = 0.9 * th.strength + 1;
-	const t = sim.elapsed;
-	ctx.fillStyle = rgb(mix(pal.moteUp, [255, 255, 255], 0.25));
+/** A level cyan ring of radius `rad` at height y around the thermal: its lift, seen from close by. */
+function liftRing(ctx: CanvasRenderingContext2D, cam: Camera, th: Thermal, y: number, rad: number, alpha: number, pal: Palette): void {
+	if (alpha <= 0.02) return;
+	for (let k = 0; k <= RING_SEGMENTS; k++) {
+		const a = (k / RING_SEGMENTS) * Math.PI * 2;
+		cam.point(th.x + Math.cos(a) * rad, y, th.z + Math.sin(a) * rad, ringPts, k * 3);
+	}
+	ctx.strokeStyle = rgba(pal.lift, Math.min(1, 0.9 * alpha));
+	for (let k = 0; k < RING_SEGMENTS; k++) {
+		const z0 = ringPts[k * 3 + 2] ?? 0, z1 = ringPts[k * 3 + 5] ?? 0;
+		if (z0 < NEAR || z1 < NEAR) continue;
+		ctx.lineWidth = Math.max(1.5, Math.min(7, (4 * cam.F) / ((z0 + z1) / 2)));
+		ctx.beginPath();
+		ctx.moveTo(cam.sx(ringPts, k * 3), cam.sy(ringPts, k * 3));
+		ctx.lineTo(cam.sx(ringPts, k * 3 + 3), cam.sy(ringPts, k * 3 + 3));
+		ctx.stroke();
+	}
+}
+
+const head = [0, 0, 0];
+const tail = [0, 0, 0];
+
+/** Thin bright streaks rushing up the column: they only ever exist inside a thermal. */
+function drawStreaks(ctx: CanvasRenderingContext2D, cam: Camera, th: Thermal, floor: number, ceil: number, total: number, power: number, pal: Palette, clock: number, salt: number): void {
+	const span = Math.max(50, ceil - floor);
+	const count = Math.round(total * Math.min(1, power * 1.3));
+	// Drawn faster than the real air, so the column visibly rushes upward.
+	const rise = 14 + 2.2 * th.strength;
+	const len = 10 + 1.3 * th.strength;
+	const id = (th.id | 0) ^ salt;
+	const col = rgb(mix(pal.moteUp, [255, 255, 255], 0.3));
+	ctx.strokeStyle = col;
+	ctx.fillStyle = col;
+	ctx.lineCap = "round";
 	for (let i = 0; i < count; i++) {
-		const id = th.id | 0;
 		// Denser toward the core, where the lift is strongest.
-		const r = th.radius * 0.8 * h(id, i, 1) ** 1.6;
-		const speed = rise * (1 - 0.6 * (r / th.radius));
-		const a = h(id, i, 2) * 6.283 + t * 0.08;
-		const y = floor + ((h(id, i, 3) * span + t * speed) % span);
-		cam.point(th.x + Math.cos(a) * r, y, th.z + Math.sin(a) * r, mote);
-		const z = mote[2] ?? 0;
-		if (z < NEAR * 2) continue;
-		const px = cam.sx(mote), py = cam.sy(mote);
-		if (px < -10 || px > cam.W + 10 || py < -40 || py > cam.H + 10) continue;
+		const r = th.radius * 0.75 * h(id, i, 1) ** 1.5;
+		const speed = rise * (1 - 0.5 * (r / th.radius));
+		const a = h(id, i, 2) * 6.283;
+		const y = floor + ((h(id, i, 3) * span + clock * speed) % span);
+		const x = th.x + Math.cos(a) * r, z = th.z + Math.sin(a) * r;
+		cam.point(x, y, z, head);
+		const zz = head[2] ?? 0;
+		if (zz < NEAR * 2) continue;
+		cam.point(x, y - len, z, tail);
+		if ((tail[2] ?? 0) < NEAR * 2) continue;
+		const px = cam.sx(head), py = cam.sy(head);
+		if (px < -10 || px > cam.W + 10 || py < -60 || py > cam.H + 60) continue;
 		const u = (y - floor) / span;
 		const ends = Math.min(1, u * 6, (1 - u) * 5);
-		const near = Math.min(1, 600 / z);
-		const alpha = ends * fade * th.life * (0.45 + 0.55 * near) * (1 - (r / th.radius) * 0.5);
-		if (alpha < 0.03) continue;
-		const s = Math.max(2.2, Math.min(5, (2.6 * cam.F) / z));
-		ctx.globalAlpha = Math.min(0.9, alpha);
-		// A small upward chevron: rising air.
+		const near = Math.min(1, 700 / zz);
+		const alpha = ends * power * (0.5 + 0.5 * near) * (1 - (r / th.radius) * 0.4);
+		if (alpha < 0.04) continue;
+		const lw = Math.max(1, Math.min(2.6, (1.8 * cam.F) / zz));
+		// A small upward chevron, the same mark as the column: it reads as "up", never as rain.
+		// Its size follows the projected streak length, capped right beside the camera.
+		const qy = cam.sy(tail);
+		const size = Math.max(3, Math.min(MAX_STREAK_PX / 3, Math.abs(qy - py) / 2));
+		ctx.globalAlpha = Math.min(0.95, alpha);
+		ctx.lineWidth = lw;
 		ctx.beginPath();
-		ctx.moveTo(px - s, py + s * 0.9);
-		ctx.lineTo(px, py - s * 0.6);
-		ctx.lineTo(px + s, py + s * 0.9);
-		ctx.lineTo(px, py + s * 0.2);
-		ctx.closePath();
-		ctx.fill();
+		ctx.moveTo(px - size, py + size * 0.75);
+		ctx.lineTo(px, py);
+		ctx.lineTo(px + size, py + size * 0.75);
+		ctx.stroke();
 	}
 	ctx.globalAlpha = 1;
 }

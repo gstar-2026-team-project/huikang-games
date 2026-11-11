@@ -1,7 +1,7 @@
 import type { Plan } from "../game/autopilot";
 import type { Sim } from "../game/flight";
 import { AirMotes } from "./air-motes";
-import { type BeaconItem, drawBeacon, drawBeaconArrow, drawBeaconMarkers, drawIdealPath, queueBeacons } from "./beacon-draw";
+import { type BeaconItem, drawBeacon, drawBeaconMarkers, drawIdealPath, queueBeacons } from "./beacon-draw";
 import { Camera } from "./camera";
 import type { Palette } from "./palette";
 import { drawPlane } from "./plane-draw";
@@ -17,6 +17,8 @@ export class Scene {
 	private readonly motes = new AirMotes();
 	private readonly items: Item[] = [];
 	private ratio = 1;
+	/** Render time (s): animates the lift streaks on every screen, the menu included. */
+	private clock = 0;
 
 	constructor(private readonly ctx: CanvasRenderingContext2D) {}
 
@@ -32,6 +34,7 @@ export class Scene {
 	draw(sim: Sim, pal: Palette, restT: number | null, plan: Plan | null = null, dt = 0): void {
 		const { ctx, cam, items } = this;
 		ctx.setTransform(this.ratio, 0, 0, this.ratio, 0, 0);
+		this.clock += Math.min(0.1, Math.max(0, dt));
 		cam.follow(sim);
 		drawSky(ctx, cam, sim, pal);
 		items.length = 0;
@@ -44,13 +47,12 @@ export class Scene {
 			if (it.kind === 0) drawQuad(ctx, cam, it);
 			else if (it.kind === 1) drawBeacon(ctx, cam, sim, it, pal);
 			else if (it.kind === 2) drawCloud(ctx, cam, it, pal);
-			else drawColumn(ctx, cam, sim, it, pal);
+			else drawColumn(ctx, cam, sim, it, pal, this.clock);
 		}
 		this.motes.update(sim, cam, dt);
 		this.motes.draw(ctx, cam, pal);
 		if (plan && sim.phase === "flying") drawIdealPath(ctx, cam, sim, plan, pal);
 		drawBeaconMarkers(ctx, cam, sim, pal);
 		drawPlane(ctx, cam, sim, pal, restT);
-		if (sim.phase === "flying") drawBeaconArrow(ctx, cam, sim, pal);
 	}
 }

@@ -103,7 +103,8 @@ export function mountApp(root: HTMLElement, props: AppProps): () => void {
 				hud.update(flight.sim, flying, input.knob, dt);
 				audio.update(flight.sim.vario, flying);
 			},
-			isIdle: () => flight.screen !== "play" && !hud.busy,
+			// The home screen is the first thing a player sees: it moves at full rate.
+			isIdle: () => flight.screen !== "play" && flight.screen !== "home" && !hud.busy,
 		},
 		budget,
 	);

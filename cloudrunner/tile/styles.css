@@ -17,6 +17,10 @@
   --ctl-line: rgba(19,49,74,0.45);
   --edge: calc(24px + 8px);
   --vbar-bg: rgba(19,49,74,0.14);
+  /* One colour per meaning, matching the scene: cyan is rising air, red is a beacon. */
+  --lift: #19c3ee;
+  --lift-glow: rgba(120,222,255,0.7);
+  --beacon: #e8382b;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -28,6 +32,9 @@
     --ctl-line: rgba(230,240,248,0.45);
     --good: #57c46a;
     --vbar-bg: rgba(230,240,248,0.14);
+    --lift: #36b6dc;
+    --lift-glow: rgba(96,196,226,0.6);
+    --beacon: #d8352a;
   }
 }
 
@@ -60,8 +67,26 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; co
 #vario .vread b { font-size: 28px; line-height: 1.05; font-variant-numeric: tabular-nums; }
 #vario .vread small { font-size: 11px; opacity: .7; }
 #vario .vword { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; opacity: .8; }
-#vario.up .vread b, #vario.up .vword { color: var(--good); opacity: 1; }
+#vario .vcap { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; opacity: .6; }
+/* Climbing cannot be missed: the whole meter turns green, with big white text. */
+#vario.up { background: var(--good); color: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,.55), 0 2px 14px rgba(0,0,0,.25); }
+#vario.up .vread b { font-size: 34px; color: #fff; opacity: 1; }
+#vario.up .vword { font-size: 16px; color: #fff; opacity: 1; }
+#vario.up .vfill { background: #fff; }
+#vario.up .vbar { background: rgba(255,255,255,.25); }
+#vario.up .vzero, #vario.up .vtick { background: #fff; }
 #vario.down .vread b, #vario.down .vword { color: var(--danger); opacity: 1; }
+/* A soft cyan glow on the screen edges while climbing in rising air; opacity is set from the render step. */
+#liftGlow { position: absolute; inset: 0; pointer-events: none; opacity: 0; box-shadow: inset 0 0 110px 34px var(--lift-glow), inset 0 0 0 4px var(--lift-glow); }
+#root:not([data-screen="play"]) #liftGlow { display: none; }
+/* Pointer chips under the top HUD: where the next beacon and the nearest lift are, from the glider's nose. */
+#pointers { position: absolute; top: calc(var(--sat) + 62px); left: 50%; transform: translateX(-50%); display: flex; gap: 8px; pointer-events: none; white-space: nowrap; }
+#root:not([data-screen="play"]) #pointers { display: none; }
+.chip { display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px 5px 8px; border-radius: 16px; font: 800 14px system-ui, sans-serif; color: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.25); font-variant-numeric: tabular-nums; }
+.chip[hidden] { display: none; }
+.chip.beacon { background: var(--beacon); }
+.chip.lift { background: var(--lift); color: #05222c; }
+.chip .arrow { display: block; flex: none; width: 17px; height: 17px; fill: currentColor; }
 #tip { position: absolute; left: 50%; top: 23%; transform: translateX(-50%); max-width: min(86%, 420px); padding: 9px 18px; border-radius: 18px; background: var(--panel-bg); border-left: 5px solid var(--good); color: var(--hud-fg); font-weight: 700; font-size: 15px; text-align: center; pointer-events: none; opacity: 0; box-shadow: 0 2px 10px rgba(0,0,0,.18); }
 #root:not([data-screen="play"]) #tip { display: none; }
 #map { position: absolute; top: calc(var(--sat) + 62px); right: calc(var(--sar) + 10px); width: 104px; height: 104px; border-radius: 50%; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
@@ -71,7 +96,7 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; co
 #rival.lead { padding-left: 12px; }
 .av { width: 28px; height: 28px; border-radius: 50%; flex: none; object-fit: cover; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #fff; background: #5b7fa3; }
 .who { overflow: hidden; text-overflow: ellipsis; }
-#warn { position: absolute; top: calc(var(--sat) + 106px); left: 0; right: 0; text-align: center; font-weight: 800; font-size: 15px; letter-spacing: .15em; color: var(--danger); pointer-events: none; }
+#warn { position: absolute; top: calc(var(--sat) + 100px); left: 0; right: 0; text-align: center; font-weight: 800; font-size: 15px; letter-spacing: .15em; color: var(--danger); pointer-events: none; }
 /* A dark pill keeps the white message readable over pale sky and snow. */
 #toast { position: absolute; top: 34%; left: 50%; transform: translateX(-50%); max-width: calc(100% - 32px); padding: 4px 16px; border-radius: 22px; background: rgba(14, 26, 38, 0.5); text-align: center; font-weight: 800; font-size: 24px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.35); pointer-events: none; opacity: 0; }
 #toast:empty { display: none; }
@@ -94,8 +119,13 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; co
 @media (max-width: 560px) {
   #vario { left: auto; right: calc(var(--sar) + 16px); transform: none; bottom: calc(var(--sab) + 28px); }
   #mute { left: auto; right: calc(var(--sar) + 16px); bottom: calc(var(--sab) + 180px); }
+  /* The chips stack on the left, under the HUD, clear of the map; the rival chip moves below them. */
+  #pointers { left: calc(var(--sal) + 10px); transform: none; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .chip { font-size: 13px; padding: 4px 10px 4px 6px; }
+  #rival { top: calc(var(--sat) + 132px); }
+  #warn { top: calc(var(--sat) + 172px); }
 }
-#path[aria-pressed="true"] { border-color: var(--accent); }
+#path[aria-pressed="true"] { border-color: var(--hud-fg); background: var(--hud-fg); color: var(--panel-bg); }
 #controls #hint { position: absolute; left: 0; right: 0; bottom: calc(var(--sab) + 250px); text-align: center; font-size: 14px; font-weight: 600; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.5); pointer-events: none; }
 #overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 0 var(--edge); }
 #overlay[hidden] { display: none; }
@@ -104,8 +134,14 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; co
 #panel p { margin: 0 0 14px; font-size: 14px; opacity: .8; line-height: 1.4; }
 #pSteps { margin: -4px 0 14px; padding: 0 0 0 20px; text-align: left; font-size: 13px; line-height: 1.35; }
 #pSteps[hidden] { display: none; }
-#pSteps li { margin: 0 0 5px; }
-#pSteps li::marker { font-weight: 800; color: var(--accent); }
+#pSteps li { margin: 0 0 6px; display: flex; align-items: center; gap: 9px; }
+#pSteps { list-style: none; padding: 0; }
+.swatch { flex: none; width: 16px; height: 16px; border-radius: 5px; box-shadow: inset 0 0 0 1.5px rgba(0,0,0,.18); }
+.swatch.lift { background: linear-gradient(90deg, rgba(120,222,255,.35), #e9fbff 50%, rgba(120,222,255,.35)); box-shadow: inset 0 0 0 2px var(--lift); }
+.swatch.climb { background: var(--good); }
+.swatch.beacon { background: repeating-linear-gradient(180deg, var(--beacon) 0 4px, #fff 4px 8px); box-shadow: inset 0 0 0 1.5px var(--beacon); }
+#pKeys { margin: -6px 0 12px !important; font-size: 12px !important; }
+#pKeys[hidden] { display: none; }
 #pBody { display: flex; flex-direction: column; gap: 8px; }
 #pBody button { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; min-height: 48px; padding: 4px 14px; border: 2px solid var(--ctl-line); border-radius: 16px; background: transparent; color: var(--hud-fg); font: 700 15px system-ui, sans-serif; }
 #pBody button small { font-size: 12px; font-weight: 500; opacity: .75; }
@@ -127,6 +163,7 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; co
   .pill b { font-size: 15px; }
   #rival { top: calc(var(--sat) + 50px); }
   #map { top: calc(var(--sat) + 50px); width: 84px; height: 84px; }
+  #pointers { top: calc(var(--sat) + 50px); }
   #warn { top: calc(var(--sat) + 92px); }
   #panel { padding: 14px 18px; }
   #panel h2 { font-size: 19px; margin-bottom: 4px; }

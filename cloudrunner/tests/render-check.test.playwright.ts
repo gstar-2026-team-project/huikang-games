@@ -56,7 +56,7 @@ let playChecks = 0;
 const screens: RenderCheckScreen[] = [
 	{
 		name: "mode menu",
-		kind: "idle",
+		kind: "play",
 		reach: async ({ frame }) => {
 			await expect(frame.locator("[data-testid=mode-daily]")).toBeVisible({ timeout: 15_000 });
 		},

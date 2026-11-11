@@ -1,5 +1,5 @@
 /** Panel contents for every non-flying screen, as plain data, plus one DOM renderer. */
-import { DAILY_TURNPOINTS, dailyDisplay, dayLabel, turnpointsText } from "../game/modes";
+import { DAILY_TURNPOINTS, dailyDisplay, dayLabel, beaconsText } from "../game/modes";
 
 export type PanelAction = "daily" | "free" | "again" | "menu" | "resume" | "invite";
 
@@ -11,23 +11,37 @@ export interface PanelButton {
 	testid: string;
 }
 
+/** The colour swatch beside a how-to step: the same colours as the scene and the HUD. */
+export type Swatch = "lift" | "climb" | "beacon";
+
+export interface HowToStep {
+	swatch: Swatch;
+	text: string;
+}
+
 export interface PanelModel {
 	title: string;
 	text: string;
-	/** A short numbered how-to under the text (the menu's). */
-	steps?: string[];
+	/** A short how-to under the text (the menu's), each step with its colour. */
+	steps?: HowToStep[];
+	/** The keyboard controls, for devices with a keyboard. */
+	keys?: string;
 	buttons: PanelButton[];
 }
 
 /** How to fly, in three steps: shown on the menu. */
-export const HOW_TO: readonly string[] = [
-	"Fly to a cloud: the golden column under it is rising air.",
-	"When the vario turns green and beeps, hold a turn to circle and climb.",
-	"Glide on to the numbered beacon and cross its ring.",
+export const HOW_TO: readonly HowToStep[] = [
+	{ swatch: "lift", text: "Find rising air: fly into the white columns under clouds" },
+	{ swatch: "climb", text: "Circle inside it to climb" },
+	{ swatch: "beacon", text: "Glide to the striped beacon" },
 ];
+
+export const KEYS_LINE = "Arrows steer, Shift for a steep turn";
 
 export interface HomeFacts {
 	day: string;
+	/** Show the keyboard line (a device with a keyboard and a fine pointer). */
+	keyboard?: boolean;
 	dailyBest: { turnpoints: number; seconds: number } | null;
 	freeBest: number;
 }
@@ -37,14 +51,15 @@ export function homePanel(f: HomeFacts): PanelModel {
 		title: "Ready to launch",
 		text: "No engine: rising air is your only way up.",
 		steps: [...HOW_TO],
+		...(f.keyboard ? { keys: KEYS_LINE } : {}),
 		buttons: [
 			{
 				action: "daily", primary: true, testid: "mode-daily", label: "Daily task",
 				sub: f.dailyBest
 					? `${dayLabel(f.day)} · best ${dailyDisplay(f.dailyBest.turnpoints, f.dailyBest.seconds)}`
-					: `${dayLabel(f.day)} · ${DAILY_TURNPOINTS} turnpoints, fastest wins`,
+					: `${dayLabel(f.day)} · ${DAILY_TURNPOINTS} beacons, fastest wins`,
 			},
-			{ action: "free", testid: "mode-free", label: "Free flight", sub: f.freeBest > 0 ? `Endless · best ${turnpointsText(f.freeBest)}` : "Endless turnpoints until you land" },
+			{ action: "free", testid: "mode-free", label: "Free flight", sub: f.freeBest > 0 ? `Endless · best ${beaconsText(f.freeBest)}` : "Endless beacons until you land" },
 			{ action: "invite", testid: "invite", label: "Challenge friends" },
 		],
 	};
@@ -90,17 +105,17 @@ export function overPanel(f: OverFacts): PanelModel {
 	if (f.mode === "daily" && f.day) {
 		const best = f.bestEntry ?? { turnpoints: f.turnpoints, seconds: f.seconds ?? 0 };
 		const flown = f.reason === "complete"
-			? `All ${DAILY_TURNPOINTS} turnpoints in ${(f.seconds ?? 0).toFixed(1)} s`
+			? `All ${DAILY_TURNPOINTS} beacons in ${(f.seconds ?? 0).toFixed(1)} s`
 			: f.turnpoints > 0
-				? `${f.turnpoints} of ${DAILY_TURNPOINTS} turnpoints`
-				: f.reason === "ground" ? "You came down before the first beacon. Climb under a cloud first." : "No turnpoints";
+				? `${f.turnpoints} of ${DAILY_TURNPOINTS} beacons`
+				: f.reason === "ground" ? "You came down before the first beacon. Climb in a white column under a cloud first." : "No beacons";
 		return {
 			title,
 			text: best.turnpoints > 0 ? `${flown} · ${dayLabel(f.day)} best ${dailyDisplay(best.turnpoints, best.seconds)}` : flown,
 			buttons,
 		};
 	}
-	return { title, text: `${turnpointsText(f.turnpoints)} · best ${turnpointsText(f.best)}`, buttons };
+	return { title, text: `${beaconsText(f.turnpoints)} · best ${beaconsText(f.best)}`, buttons };
 }
 
 export function loadingPanel(): PanelModel {
@@ -109,7 +124,7 @@ export function loadingPanel(): PanelModel {
 
 /** Draw a panel model into the overlay. Buttons carry data-action for one delegated handler. */
 export function renderPanel(
-	refs: { pTitle: HTMLElement; pText: HTMLElement; pSteps: HTMLElement; pBody: HTMLElement },
+	refs: { pTitle: HTMLElement; pText: HTMLElement; pSteps: HTMLElement; pKeys: HTMLElement; pBody: HTMLElement },
 	model: PanelModel,
 ): void {
 	refs.pTitle.textContent = model.title;
@@ -117,12 +132,17 @@ export function renderPanel(
 	const steps = model.steps ?? [];
 	refs.pSteps.hidden = steps.length === 0;
 	refs.pSteps.replaceChildren(
-		...steps.map((text) => {
+		...steps.map((step) => {
 			const li = document.createElement("li");
-			li.textContent = text;
+			const sw = document.createElement("span");
+			sw.className = `swatch ${step.swatch}`;
+			sw.setAttribute("aria-hidden", "true");
+			li.append(sw, document.createTextNode(step.text));
 			return li;
 		}),
 	);
+	refs.pKeys.hidden = !model.keys;
+	refs.pKeys.textContent = model.keys ?? "";
 	refs.pBody.replaceChildren(
 		...model.buttons.map((b) => {
 			const el = document.createElement("button");

@@ -15,7 +15,7 @@ test("a finished flight bumps only the pilot's own row; a new daily best reaches
 		await (await alice.mutate.finishRun({ runId: "r1", turnpoints: 3, endedAt: 2000, reason: "ground", seconds: 140 })).confirmed;
 
 		const aliceRow = await h.manager("alice").wait((v) => v.previewTimestamp === 2000);
-		expect(aliceRow.preview).toBe("You reached 3 turnpoints in the Jun 12 daily task");
+		expect(aliceRow.preview).toBe("You reached 3 beacons in the Jun 12 daily task");
 		expect(aliceRow.pushes).toHaveLength(0);
 		const bobRow = await h.manager("bob").wait((v) => v.pushes.length > bobBefore.pushes.length);
 		expect(bobRow.pushes).toHaveLength(bobBefore.pushes.length + 1);

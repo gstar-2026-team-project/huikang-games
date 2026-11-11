@@ -15,19 +15,22 @@ export interface Palette {
 	mid: RGB;
 	high: RGB;
 	snow: RGB;
-	/** Windward slopes that give slope lift: a warm sunlit tint. */
+	/** Windward slopes that give slope lift: a pale cyan tint, the colour of rising air. */
 	slopeLift: RGB;
-	/** Turnpoint beacons: the next one, later ones, and one just reached. */
+	/** Beacons (red and white striped masts): the next one, later ones, and one just reached. */
 	beacon: string;
 	beaconRgb: RGB;
 	beaconDim: string;
 	beaconHit: string;
 	beaconHitRgb: RGB;
-	/** Thermals: the cloud on top, its shaded base, and the rising air in the column. */
+	/** The white bands on a beacon's mast. */
+	mast: RGB;
+	/** Thermals: the cloud on top, its shaded base, and the rising air in the column (cool cyan, never gold). */
 	cloud: RGB;
 	cloudShade: RGB;
 	lift: RGB;
-	/** Air motes: drifting up in lift, sinking in sink. */
+	liftCore: RGB;
+	/** Air motes: streaks rushing up in lift (cyan), a faint neutral drift down in sink. */
 	moteUp: RGB;
 	moteDown: RGB;
 	/** Thermals on the map, weak to strong. */
@@ -49,11 +52,12 @@ export const PALETTES: { light: Palette; dark: Palette } = {
 		skyTop: [58, 128, 206], skyMid: [118, 178, 230], skyLow: [214, 234, 244], haze: [200, 222, 232], sun: [255, 246, 214],
 		ridgeNear: [132, 164, 176], ridgeFar: [170, 196, 210],
 		water: [62, 138, 190], low: [124, 176, 88], mid: [84, 140, 72],
-		high: [146, 128, 100], snow: [240, 244, 248], slopeLift: [232, 196, 92],
-		beacon: "#ffb400", beaconRgb: [255, 180, 0], beaconDim: "rgba(255,180,0,0.5)", beaconHit: "#5fd36b", beaconHitRgb: [95, 211, 107],
-		cloud: [255, 255, 255], cloudShade: [168, 182, 202], lift: [255, 214, 120],
-		moteUp: [255, 236, 170], moteDown: [120, 150, 190],
-		liftWeak: [255, 236, 150], liftStrong: [255, 122, 40],
+		high: [146, 128, 100], snow: [240, 244, 248], slopeLift: [176, 228, 226],
+		beacon: "#e8382b", beaconRgb: [232, 56, 43], beaconDim: "rgba(232,56,43,0.55)", beaconHit: "#5fd36b", beaconHitRgb: [95, 211, 107],
+		mast: [250, 250, 250],
+		cloud: [255, 255, 255], cloudShade: [168, 182, 202], lift: [120, 222, 255], liftCore: [236, 252, 255],
+		moteUp: [196, 246, 255], moteDown: [214, 218, 224],
+		liftWeak: [150, 230, 250], liftStrong: [20, 200, 245],
 		path: "#ffffff", planeRed: "#d8402f", planeWhite: "#f6f7f8",
 		gliderBody: [246, 247, 248], gliderTrim: [216, 64, 47], gliderGlass: [52, 92, 128],
 	},
@@ -61,11 +65,12 @@ export const PALETTES: { light: Palette; dark: Palette } = {
 		skyTop: [24, 52, 88], skyMid: [50, 90, 128], skyLow: [116, 142, 160], haze: [100, 124, 140], sun: [214, 204, 172],
 		ridgeNear: [70, 92, 106], ridgeFar: [92, 116, 132],
 		water: [38, 86, 124], low: [72, 112, 56], mid: [50, 88, 46],
-		high: [96, 84, 68], snow: [176, 184, 192], slopeLift: [170, 140, 64],
-		beacon: "#e6a200", beaconRgb: [230, 162, 0], beaconDim: "rgba(230,162,0,0.5)", beaconHit: "#4cb858", beaconHitRgb: [76, 184, 88],
-		cloud: [206, 216, 226], cloudShade: [116, 130, 148], lift: [226, 196, 128],
-		moteUp: [226, 206, 140], moteDown: [110, 136, 170],
-		liftWeak: [224, 206, 128], liftStrong: [226, 106, 36],
+		high: [96, 84, 68], snow: [176, 184, 192], slopeLift: [112, 168, 170],
+		beacon: "#d8352a", beaconRgb: [216, 53, 42], beaconDim: "rgba(216,53,42,0.55)", beaconHit: "#4cb858", beaconHitRgb: [76, 184, 88],
+		mast: [214, 218, 222],
+		cloud: [206, 216, 226], cloudShade: [116, 130, 148], lift: [96, 196, 226], liftCore: [200, 236, 246],
+		moteUp: [170, 228, 244], moteDown: [160, 168, 178],
+		liftWeak: [120, 200, 224], liftStrong: [20, 176, 220],
 		path: "#e2e8ee", planeRed: "#b8342a", planeWhite: "#d6dbe0",
 		gliderBody: [204, 210, 216], gliderTrim: [184, 52, 42], gliderGlass: [40, 70, 100],
 	},

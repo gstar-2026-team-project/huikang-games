@@ -1,5 +1,5 @@
 import { notifyActivity, setLeaderboardScore } from "poe-tiles-sdk/v1/client.js";
-import { DAILY_SECONDS, DAILY_TURNPOINTS, dailyDisplay, dailyScore, dayLabel, decodeDailyScore, turnpointsText } from "../../game/modes";
+import { DAILY_SECONDS, DAILY_TURNPOINTS, dailyDisplay, dailyScore, dayLabel, decodeDailyScore, beaconsText } from "../../game/modes";
 import { dailyBoardId, LEADERBOARD_ID, LEADERBOARD_LABEL, type RunEndReason, TURNPOINT_UNIT } from "../constants";
 import { type AppMutationContext, CURRENT_RUN_KEY, readPilot } from "../data/index";
 import type { RunRow } from "../schema";
@@ -40,7 +40,7 @@ export async function finalizeRun(
 		},
 	});
 
-	let preview = turnpoints > 0 ? `You reached ${turnpointsText(turnpoints)}` : "You took a flight";
+	let preview = turnpoints > 0 ? `You reached ${beaconsText(turnpoints)}` : "You took a flight";
 	if (daily && run.day) {
 		if (turnpoints > 0) {
 			// The daily board owns the high-score push: a new best for the day tells the others.
@@ -55,7 +55,7 @@ export async function finalizeRun(
 				displayScore: dailyDisplay(turnpoints, decodeDailyScore(score).seconds),
 			});
 		}
-		preview = `You reached ${turnpointsText(turnpoints)} in the ${dayLabel(run.day)} daily task`;
+		preview = `You reached ${beaconsText(turnpoints)} in the ${dayLabel(run.day)} daily task`;
 	} else if (turnpoints > 0) {
 		await setLeaderboardScore(
 			ctx,

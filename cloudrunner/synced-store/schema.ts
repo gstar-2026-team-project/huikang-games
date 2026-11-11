@@ -48,7 +48,7 @@ export const tileSchema = defineSchema({
 			}),
 		},
 		reachTurnpoint: {
-			description: "Checkpoint the turnpoint count of the current flight",
+			description: "Checkpoint the beacon count of the current flight",
 			input: z.object({ runId: z.string().min(1).max(64), turnpoints }),
 		},
 		finishRun: {

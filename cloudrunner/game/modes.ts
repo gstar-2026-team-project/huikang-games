@@ -30,8 +30,8 @@ export function decodeDailyScore(score: number): { turnpoints: number; seconds: 
 	const turnpoints = Math.floor(score / SCORE_STEP);
 	return { turnpoints, seconds: (DAILY_SECONDS * 10 - (score - turnpoints * SCORE_STEP)) / 10 };
 }
-export const turnpointsText = (n: number) => `${n} ${n === 1 ? "turnpoint" : "turnpoints"}`;
-export const dailyDisplay = (turnpoints: number, seconds: number) => `${turnpointsText(turnpoints)} · ${seconds.toFixed(1)} s`;
+export const beaconsText = (n: number) => `${n} ${n === 1 ? "beacon" : "beacons"}`;
+export const dailyDisplay = (turnpoints: number, seconds: number) => `${beaconsText(turnpoints)} · ${seconds.toFixed(1)} s`;
 
 /** One task per calendar day (UTC), the same for every pilot. */
 export function dayKey(nowMs: number): string {

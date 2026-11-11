@@ -66,12 +66,12 @@ test.describe("standalone web build", () => {
 		await expect(root).toHaveAttribute("data-screen", "over", { timeout: 30_000 });
 		await page.keyboard.up("ArrowDown");
 		await expect(page.locator("#pTitle")).toHaveText("Landed out");
-		await expect(page.locator("#pText")).toContainText("best 1 turnpoint");
+		await expect(page.locator("#pText")).toContainText("best 1 beacon");
 		// Nobody else is on the board, so there is no score to beat.
 		await expect(page.locator("[data-testid=rival]")).toBeHidden();
 
 		await page.reload();
-		await expect(page.locator("[data-testid=mode-daily]")).toContainText("best 1 turnpoint", { timeout: 15_000 });
+		await expect(page.locator("[data-testid=mode-daily]")).toContainText("best 1 beacon", { timeout: 15_000 });
 
 		await page.locator("[data-testid=mode-free]").click();
 		await expect(root).toHaveAttribute("data-screen", "play");

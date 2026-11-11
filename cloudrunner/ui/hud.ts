@@ -1,5 +1,7 @@
 import { STALL_SPEED } from "../game/constants";
 import { groundBelow, type Sim } from "../game/flight";
+import { beaconPointer, liftPointer, type Pointer } from "../game/guide";
+import { distanceText } from "../render/beacon-draw";
 import { initials, type Profile, type RivalView } from "./rivals";
 import type { ShellRefs } from "./shell";
 
@@ -9,7 +11,7 @@ const GROUND_LOW = 60;
 const GROUND_DANGER = 25;
 /** Warn when the ground is this many seconds away at the current sink rate. */
 const IMPACT_WARN_SECONDS = 3;
-/** Variometer bands (m/s): green when going up, red when coming down. */
+/** Climb meter bands (m/s): green when going up, red when coming down. */
 const VARIO_CLIMBING = 0.2;
 const VARIO_SINKING = -0.2;
 /** Climb rate (m/s) that fills the variometer bar to the top (or the bottom). */
@@ -42,6 +44,20 @@ export function varioText(climb: number): string {
 	return `${v > 0 ? "+" : ""}${v.toFixed(1)}`;
 }
 
+/** Climb rate (m/s) at which the cyan edge glow is at full strength. */
+const GLOW_FULL = 3;
+
+/** The edge glow's opacity for a climb rate: none unless climbing, in 0.05 steps. */
+export function liftGlow(climb: number): number {
+	if (climb <= VARIO_CLIMBING) return 0;
+	return Math.round(Math.min(1, 0.4 + (0.6 * climb) / GLOW_FULL) * 20) / 20;
+}
+
+/** CSS rotation for a pointer arrow (drawn pointing right): 0 is straight up, in 3° steps. */
+export function arrowRotation(rel: number): string {
+	return `rotate(${Math.round((rel * 180) / Math.PI / 3) * 3 - 90}deg)`;
+}
+
 const BANNER_SECONDS = 2.2;
 const TOAST_FADE = 0.3;
 
@@ -60,7 +76,7 @@ export class Hud {
 		this.last.set(key, value);
 		el.textContent = value;
 	}
-	private style(key: string, el: HTMLElement, prop: "transform" | "opacity", value: string): void {
+	private style(key: string, el: HTMLElement | SVGElement, prop: "transform" | "opacity", value: string): void {
 		if (this.last.get(key) === value) return;
 		this.last.set(key, value);
 		el.style[prop] = value;
@@ -69,6 +85,17 @@ export class Hud {
 		if (this.last.get(key) === state) return;
 		this.last.set(key, state);
 		for (const c of classes) el.classList.toggle(c, c === state);
+	}
+
+	private chip(key: string, el: HTMLElement, arrow: SVGElement, label: HTMLElement, ptr: Pointer | null, name: string): void {
+		const shown = ptr !== null;
+		if (this.last.get(`${key}Shown`) !== String(shown)) {
+			this.last.set(`${key}Shown`, String(shown));
+			el.hidden = !shown;
+		}
+		if (!ptr) return;
+		this.style(`${key}Rot`, arrow, "transform", arrowRotation(ptr.rel));
+		this.text(`${key}Text`, label, `${name} · ${distanceText(ptr.dist)}`);
 	}
 
 	toast(message: string): void {
@@ -116,7 +143,11 @@ export class Hud {
 		const state = climb > VARIO_CLIMBING ? "up" : climb < VARIO_SINKING ? "down" : "";
 		this.text("vario", ui.varioVal, varioText(climb));
 		this.flag("vario", ui.varioBox, state, ["up", "down"]);
-		this.text("varioWord", ui.varioWord, state === "up" ? "Climb" : state === "down" ? "Sink" : "Level");
+		this.text("varioWord", ui.varioWord, state === "up" ? "Rising" : state === "down" ? "Sinking" : "Level");
+		this.style("glow", ui.liftGlow, "opacity", String(liftGlow(climb)));
+		// The pointer chips: the next beacon always, the nearest lift unless already in it.
+		this.chip("beacon", ui.beaconChip, ui.beaconArrow, ui.beaconText, flying ? beaconPointer(sim) : null, `Beacon ${sim.next + 1}`);
+		this.chip("lift", ui.liftChip, ui.liftArrow, ui.liftText, flying ? liftPointer(sim, state === "up") : null, "Lift");
 		this.style("varioFill", ui.varioFill, "transform", `scaleY(${varioFill(climb).toFixed(3)})`);
 		this.text("spd", ui.spdVal, String(Math.round(p.v * 3.6)));
 		this.style("knob", ui.knob, "transform", `translate(${(knob.x * 46).toFixed(0)}px,${(-knob.y * 46).toFixed(0)}px)`);

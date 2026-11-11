@@ -1,7 +1,7 @@
 /**
  * Soft shapes baked once into small offscreen canvases (per palette) and then
- * drawn with one drawImage each: cumulus clouds, the rising-air column, a
- * beacon's light beam and a round glow. Gradients and many overlapping arcs
+ * drawn with one drawImage each: cumulus clouds, the rising-air column and a
+ * round glow. Gradients and many overlapping arcs
  * cost nothing per frame this way.
  */
 import { mix, type Palette, type RGB, rgba } from "./palette";
@@ -104,52 +104,45 @@ export function cloudSprite(pal: Palette, variant: number): Sprite {
 	});
 }
 
-/** The rising-air column: a soft vertical band, brightest along its axis, fading at both ends. */
-export function columnSprite(pal: Palette): Sprite {
-	return cached(pal, "column", () => {
-		const W = 64, H = 256;
+/**
+ * The rising-air column: a cool cyan band, white along its core, with soft
+ * upward chevrons so even a still frame reads as air going up. The band and
+ * the chevrons are separate sprites: close up, the chevrons fade out. It runs from
+ * the ground (bottom) into the cloud base (top), where it is brightest.
+ */
+export function columnSprite(pal: Palette, chevrons: boolean): Sprite {
+	return cached(pal, chevrons ? "columnUp" : "column", () => {
+		const W = 96, H = 256;
 		const { c, g } = canvas(W, H);
 		if (!g) return c;
 		const across = g.createLinearGradient(0, 0, W, 0);
 		across.addColorStop(0, rgba(pal.lift, 0));
-		across.addColorStop(0.25, rgba(pal.lift, 0.4));
-		across.addColorStop(0.5, rgba(mix(pal.lift, [255, 255, 255], 0.25), 0.95));
-		across.addColorStop(0.75, rgba(pal.lift, 0.4));
+		across.addColorStop(0.18, rgba(pal.lift, 0.35));
+		across.addColorStop(0.5, rgba(mix(pal.lift, pal.liftCore, 0.7), 0.8));
+		across.addColorStop(0.82, rgba(pal.lift, 0.35));
 		across.addColorStop(1, rgba(pal.lift, 0));
-		g.fillStyle = across;
-		g.fillRect(0, 0, W, H);
+		if (!chevrons) {
+			g.fillStyle = across;
+			g.fillRect(0, 0, W, H);
+		}
+		// Soft upward chevrons along the core: even a still frame says "this air goes up".
+		g.strokeStyle = rgba(pal.liftCore, 0.6);
+		g.lineCap = "round";
+		g.lineJoin = "round";
+		g.lineWidth = 5;
+		for (let i = 0; i < (chevrons ? 4 : 0); i++) {
+			const y = H * (0.22 + 0.2 * i);
+			g.beginPath();
+			g.moveTo(W * 0.3, y + W * 0.16);
+			g.lineTo(W * 0.5, y);
+			g.lineTo(W * 0.7, y + W * 0.16);
+			g.stroke();
+		}
 		const along = g.createLinearGradient(0, 0, 0, H);
-		along.addColorStop(0, "rgba(0,0,0,0.35)");
-		along.addColorStop(0.12, "rgba(0,0,0,1)");
-		along.addColorStop(0.85, "rgba(0,0,0,0.85)");
-		along.addColorStop(1, "rgba(0,0,0,0)");
-		g.globalCompositeOperation = "destination-in";
-		g.fillStyle = along;
-		g.fillRect(0, 0, W, H);
-		g.globalCompositeOperation = "source-over";
-		return c;
-	});
-}
-
-/** A beacon's beam of light: a bright core in a soft halo, fading out as it rises. */
-export function beamSprite(pal: Palette, color: RGB, key: string): Sprite {
-	return cached(pal, `beam${key}`, () => {
-		const W = 48, H = 256;
-		const { c, g } = canvas(W, H);
-		if (!g) return c;
-		const across = g.createLinearGradient(0, 0, W, 0);
-		across.addColorStop(0, rgba(color, 0));
-		across.addColorStop(0.32, rgba(color, 0.35));
-		across.addColorStop(0.46, rgba(mix(color, [255, 255, 255], 0.5), 0.95));
-		across.addColorStop(0.54, rgba(mix(color, [255, 255, 255], 0.5), 0.95));
-		across.addColorStop(0.68, rgba(color, 0.35));
-		across.addColorStop(1, rgba(color, 0));
-		g.fillStyle = across;
-		g.fillRect(0, 0, W, H);
-		const along = g.createLinearGradient(0, 0, 0, H);
-		along.addColorStop(0, "rgba(0,0,0,0)");
-		along.addColorStop(0.5, "rgba(0,0,0,0.75)");
-		along.addColorStop(1, "rgba(0,0,0,1)");
+		along.addColorStop(0, "rgba(0,0,0,0.95)");
+		along.addColorStop(0.1, "rgba(0,0,0,1)");
+		along.addColorStop(0.85, "rgba(0,0,0,0.8)");
+		along.addColorStop(1, "rgba(0,0,0,0.15)");
 		g.globalCompositeOperation = "destination-in";
 		g.fillStyle = along;
 		g.fillRect(0, 0, W, H);

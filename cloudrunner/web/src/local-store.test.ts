@@ -17,7 +17,7 @@ function memoryStorage(initial: Record<string, string> = {}): StorageLike {
 
 const open = (storage: StorageLike | null) => new LocalStore(storage, () => NOW);
 
-test("free flights keep the most turnpoints and survive a reload", async () => {
+test("free flights keep the most beacons and survive a reload", async () => {
 	const storage = memoryStorage();
 	const store = open(storage).client();
 	await store.mutate.startRun({ runId: "r1", seed: 4, startedAt: 1000 });
@@ -36,7 +36,7 @@ test("free flights keep the most turnpoints and survive a reload", async () => {
 	expect(view.run).toMatchObject({ runId: "r2", status: "done", reason: "ground" });
 });
 
-test("the daily task ranks turnpoints first, then the faster time, for today only", async () => {
+test("the daily task ranks beacons first, then the faster time, for today only", async () => {
 	const local = open(memoryStorage());
 	const store = local.client();
 	const fly = async (runId: string, day: string, turnpoints: number, seconds: number) => {

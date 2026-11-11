@@ -7,7 +7,6 @@ import { surfaceHeight } from "../game/terrain";
 import type { Camera } from "./camera";
 import { NEAR } from "./camera";
 import { type Palette, rgba } from "./palette";
-import { beamSprite } from "./sprites";
 
 const SEGMENTS = 28;
 const pts = new Float32Array((SEGMENTS + 1) * 3);
@@ -15,11 +14,23 @@ const tmp = [0, 0, 0];
 const top = [0, 0, 0];
 /** Beacons drawn past the next one. */
 const BEACONS_SHOWN = 3;
-/** The beam rises this high above the ground (m): above the clouds, so it shows over hills. */
-const BEAM_HEIGHT = 1100;
-/** Beam width (m), and the narrowest it is drawn (px) so a far beacon still shows. */
-const BEAM_WIDTH = 28;
-const BEAM_MIN_PX = 5;
+/**
+ * The next beacon's mast stands at least this high above the ground (m), and
+ * always reaches a little above the glider, so its board is at eye level
+ * however high you fly. Later beacons are short, thin and faint.
+ */
+const MAST_HEIGHT = 260;
+const MAST_OVER_GLIDER = 30;
+/** Roughly how tall each red or white band is (m). */
+const BAND_HEIGHT = 36;
+/** Mast width (m), and the narrowest the next one is drawn (px) so it still shows from far off. */
+const MAST_WIDTH = 16;
+const MAST_MIN_PX = 4;
+const MAST_MAX_PX = 30;
+/** The numbered board on top (m wide). */
+const BOARD_WIDTH = 90;
+/** The next beacon's board (with its distance tag) never rises above this (CSS px from the top): the HUD and chips live there. */
+const BOARD_TOP_CLEAR = 128;
 
 export interface BeaconItem { kind: 1; z: number; tp: Turnpoint; index: number; next: boolean; fx: number | null }
 
@@ -41,7 +52,7 @@ export function distanceText(m: number): string {
 	return m < 995 ? `${Math.max(0, Math.round(m / 10) * 10)} m` : `${(m / 1000).toFixed(1)} km`;
 }
 
-/** Upcoming turnpoints, plus the one just reached: green and widening as it fades. */
+/** Upcoming beacons, plus the one just reached: green and widening as it fades. */
 export function queueBeacons(sim: Sim, cam: Camera, items: BeaconItem[]): void {
 	const end = Math.min(sim.turnpoints.length, sim.next + BEACONS_SHOWN);
 	for (let i = sim.next; i < end; i++) {
@@ -55,6 +66,11 @@ export function queueBeacons(sim: Sim, cam: Camera, items: BeaconItem[]): void {
 		cam.point(f.tp.x, sim.plane.y, f.tp.z, tmp);
 		items.push({ kind: 1, z: Math.max(tmp[2] ?? 0, NEAR), tp: f.tp, index: -1, next: true, fx: f.t / TURNPOINT_FX_DURATION });
 	}
+}
+
+/** Height (m) of the top of a beacon's mast standing on ground at `ground`. */
+function mastTopY(sim: Sim, ground: number, next: boolean): number {
+	return next ? Math.max(ground + MAST_HEIGHT, sim.plane.y + MAST_OVER_GLIDER) : ground + MAST_HEIGHT * 0.6;
 }
 
 /** A level circle of radius `rad` around the beacon at height y, filled and outlined. */
@@ -88,9 +104,9 @@ function groundRing(ctx: CanvasRenderingContext2D, cam: Camera, tp: Turnpoint, y
 }
 
 /**
- * A turnpoint: a tall beam of light from a ring on the ground that marks how
- * close counts, with a numbered marker at the glider's height and, for the
- * next one, the distance to it. The next beacon is bright, later ones dim.
+ * A beacon: a tall red-and-white striped mast standing in a red ring on the
+ * ground that marks how close counts. The next beacon is bright; later ones
+ * are dim. One just reached turns green and its ring widens as it fades.
  */
 export function drawBeacon(ctx: CanvasRenderingContext2D, cam: Camera, sim: Sim, it: BeaconItem, pal: Palette): void {
 	const tp = it.tp;
@@ -100,51 +116,72 @@ export function drawBeacon(ctx: CanvasRenderingContext2D, cam: Camera, sim: Sim,
 	const col = hit ? pal.beaconHitRgb : pal.beaconRgb;
 	const strong = it.next ? 1 : 0.4;
 	const fade = hit ? 1 - k : 1;
-	groundRing(ctx, cam, tp, ground + 3, tp.r * (1 + k * 0.8), rgba(col, 0.2 * strong * fade), rgba(col, 0.85 * strong * fade));
-	// The beam.
+	groundRing(ctx, cam, tp, ground + 3, tp.r * (1 + k * 0.8), rgba(col, 0.22 * strong * fade), rgba(col, 0.95 * strong * fade));
 	cam.point(tp.x, ground, tp.z, tmp);
-	cam.point(tp.x, ground + BEAM_HEIGHT, tp.z, top);
-	if ((tmp[2] ?? 0) > NEAR && (top[2] ?? 0) > NEAR) {
-		const bx = cam.sx(tmp), by = cam.sy(tmp), tx = cam.sx(top), ty = cam.sy(top);
-		const len = Math.hypot(tx - bx, ty - by);
-		const w = Math.max(BEAM_MIN_PX, (BEAM_WIDTH * (1 + k) * cam.F) / it.z);
-		ctx.save();
-		ctx.globalAlpha = (it.next ? 0.95 : 0.4) * fade;
-		ctx.translate(bx, by);
-		ctx.rotate(Math.atan2(tx - bx, -(ty - by)));
-		ctx.drawImage(beamSprite(pal, col, hit ? "hit" : "next"), -w / 2, -len, w, len);
-		ctx.restore();
+	// A beacon just reached keeps only its widening green ring: you are right over it.
+	if (hit) return;
+	const mastTop = mastTopY(sim, ground, it.next);
+	cam.point(tp.x, mastTop, tp.z, top);
+	if ((tmp[2] ?? 0) <= NEAR || (top[2] ?? 0) <= NEAR) return;
+	const bx = cam.sx(tmp), by = cam.sy(tmp), tx = cam.sx(top), ty = cam.sy(top);
+	const len = Math.hypot(tx - bx, ty - by);
+	if (len < 2) return;
+	const w = it.next ? Math.max(MAST_MIN_PX, Math.min(MAST_MAX_PX, (MAST_WIDTH * cam.F) / it.z)) : Math.max(1.5, (MAST_WIDTH * 0.6 * cam.F) / it.z);
+	ctx.save();
+	ctx.globalAlpha = (it.next ? 1 : 0.35) * fade;
+	ctx.translate(bx, by);
+	ctx.rotate(Math.atan2(tx - bx, -(ty - by)));
+	// A dark edge so the white bands show against pale sky and snow.
+	ctx.fillStyle = "rgba(20,24,30,0.45)";
+	ctx.fillRect(-w / 2 - 1, -len - 1, w + 2, len + 1);
+	const bands = Math.max(6, 2 * Math.round((mastTop - ground) / (2 * BAND_HEIGHT)));
+	const band = len / bands;
+	for (let i = 0; i < bands; i++) {
+		ctx.fillStyle = i % 2 === 0 ? rgba(col, 1) : rgba(pal.mast, 1);
+		ctx.fillRect(-w / 2, -(i + 1) * band, w, band + 0.5);
 	}
+	ctx.restore();
 }
 
-/** The numbered markers, drawn over the scene so a hill never hides them. */
+/** The numbered boards at the mast tops, drawn over the scene so a hill never hides the next one. */
 export function drawBeaconMarkers(ctx: CanvasRenderingContext2D, cam: Camera, sim: Sim, pal: Palette): void {
 	const end = Math.min(sim.turnpoints.length, sim.next + BEACONS_SHOWN);
 	for (let i = end - 1; i >= sim.next; i--) {
 		const tp = sim.turnpoints[i];
-		if (tp) drawMarker(ctx, cam, sim, tp, i, i === sim.next, pal);
+		if (tp) drawBoard(ctx, cam, sim, tp, i, i === sim.next, pal);
 	}
 }
 
-/** The numbered badge on the beam at the glider's height, facing the camera, with the distance under it. */
-function drawMarker(ctx: CanvasRenderingContext2D, cam: Camera, sim: Sim, tp: Turnpoint, index: number, next: boolean, pal: Palette): void {
+/**
+ * A numbered board on top of the mast, facing the camera: big and red for the
+ * next beacon with its distance under it, small and grey for later ones.
+ */
+function drawBoard(ctx: CanvasRenderingContext2D, cam: Camera, sim: Sim, tp: Turnpoint, index: number, next: boolean, pal: Palette): void {
 	const p = sim.plane;
-	cam.point(tp.x, p.y + 40, tp.z, tmp);
+	const ground = surfaceHeight(sim.terrain, tp.x, tp.z);
+	cam.point(tp.x, mastTopY(sim, ground, next), tp.z, tmp);
 	const z = tmp[2] ?? 0;
 	if (z < NEAR * 10) return;
-	const x = cam.sx(tmp), y = cam.sy(tmp);
-	if (x < -40 || x > cam.W + 40 || y < -40 || y > cam.H + 40) return;
-	const r = next ? 15 : 11;
-	ctx.globalAlpha = next ? 1 : 0.6;
-	ctx.fillStyle = next ? pal.beacon : "rgba(40,40,40,0.55)";
-	ctx.strokeStyle = next ? "#fff" : pal.beacon;
-	ctx.lineWidth = 2.5;
+	const x = cam.sx(tmp), y0 = cam.sy(tmp);
+	const bw = next ? Math.max(40, Math.min(84, (BOARD_WIDTH * cam.F) / z)) : Math.max(20, Math.min(40, (BOARD_WIDTH * 0.7 * cam.F) / z));
+	const bh = bw * 0.72;
+	// The board sits on the mast top; close by, the next one slides down the mast to stay clear of the HUD.
+	const y = next ? Math.max(y0 - bh / 2, BOARD_TOP_CLEAR + bh / 2) : y0 - bh / 2;
+	if (x < -bw || x > cam.W + bw || y < -bh || y > cam.H + bh) return;
+	ctx.globalAlpha = next ? 1 : 0.45;
+	ctx.fillStyle = "rgba(10,14,20,0.35)";
 	ctx.beginPath();
-	ctx.arc(x, y, r, 0, 6.283);
+	ctx.roundRect(x - bw / 2 + 2, y - bh / 2 + 3, bw, bh, 6);
+	ctx.fill();
+	ctx.fillStyle = next ? pal.beacon : "rgba(60,64,70,0.9)";
+	ctx.strokeStyle = next ? "#fff" : pal.beacon;
+	ctx.lineWidth = next ? 3 : 2;
+	ctx.beginPath();
+	ctx.roundRect(x - bw / 2, y - bh / 2, bw, bh, 6);
 	ctx.fill();
 	ctx.stroke();
-	ctx.fillStyle = next ? "#2a1a00" : "#fff";
-	ctx.font = `800 ${next ? 15 : 11}px system-ui, sans-serif`;
+	ctx.fillStyle = "#fff";
+	ctx.font = `800 ${Math.round(bh * 0.66)}px system-ui, sans-serif`;
 	ctx.textAlign = "center";
 	ctx.textBaseline = "middle";
 	ctx.fillText(String(index + 1), x, y + 1);
@@ -152,60 +189,14 @@ function drawMarker(ctx: CanvasRenderingContext2D, cam: Camera, sim: Sim, tp: Tu
 		const label = distanceText(Math.hypot(tp.x - p.x, tp.z - p.z));
 		ctx.font = "700 13px system-ui, sans-serif";
 		const w = textWidth(ctx, label) + 12;
-		ctx.fillStyle = "rgba(20,30,40,0.6)";
+		ctx.fillStyle = "rgba(20,30,40,0.7)";
 		ctx.beginPath();
-		ctx.roundRect(x - w / 2, y + r + 4, w, 18, 9);
+		ctx.roundRect(x - w / 2, y - bh / 2 - 24, w, 19, 9);
 		ctx.fill();
 		ctx.fillStyle = "#fff";
-		ctx.fillText(label, x, y + r + 13.5);
+		ctx.fillText(label, x, y - bh / 2 - 14);
 	}
 	ctx.globalAlpha = 1;
-}
-
-/** Edge arrow toward the next beacon when it is off screen, with the distance beside it. */
-export function drawBeaconArrow(ctx: CanvasRenderingContext2D, cam: Camera, sim: Sim, pal: Palette): void {
-	const tp = sim.turnpoints[sim.next];
-	if (!tp) return;
-	const p = sim.plane;
-	cam.point(tp.x, p.y, tp.z, tmp);
-	const ahead = (tmp[2] ?? 0) > NEAR;
-	if (ahead) {
-		const X = cam.sx(tmp);
-		if (X > 40 && X < cam.W - 40) return;
-	}
-	// Direction on screen: sideways by the beacon's bearing, never up or down.
-	const side = (tmp[0] ?? 0) >= 0 ? 1 : -1;
-	const behind = !ahead;
-	const ang = behind ? (side > 0 ? 0.5 : Math.PI - 0.5) : side > 0 ? 0 : Math.PI;
-	const ex = side > 0 ? cam.W - 34 : 34;
-	const ey = Math.min(cam.H * 0.62, cam.horizonY + (behind ? cam.H * 0.12 : 0));
-	ctx.save();
-	ctx.translate(ex, ey);
-	ctx.rotate(ang);
-	ctx.fillStyle = pal.beacon;
-	ctx.strokeStyle = "rgba(0,0,0,0.4)";
-	ctx.lineWidth = 2;
-	ctx.beginPath();
-	ctx.moveTo(18, 0);
-	ctx.lineTo(-9, -14);
-	ctx.lineTo(-3, 0);
-	ctx.lineTo(-9, 14);
-	ctx.closePath();
-	ctx.fill();
-	ctx.stroke();
-	ctx.restore();
-	const label = `${sim.next + 1} · ${distanceText(Math.hypot(tp.x - p.x, tp.z - p.z))}`;
-	ctx.font = "700 12px system-ui, sans-serif";
-	ctx.textAlign = side > 0 ? "right" : "left";
-	ctx.textBaseline = "middle";
-	const w = textWidth(ctx, label) + 12;
-	const lx = side > 0 ? ex - 24 : ex + 24;
-	ctx.fillStyle = "rgba(20,30,40,0.6)";
-	ctx.beginPath();
-	ctx.roundRect(side > 0 ? lx - w + 6 : lx - 6, ey - 10, w, 20, 10);
-	ctx.fill();
-	ctx.fillStyle = "#fff";
-	ctx.fillText(label, lx, ey + 0.5);
 }
 
 /** How far under the planned line the dashes are drawn (m). */

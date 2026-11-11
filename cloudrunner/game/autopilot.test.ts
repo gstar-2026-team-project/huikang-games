@@ -63,7 +63,7 @@ test("steering straight for the beacons without ever circling rarely finishes: t
 	expect(finished).toBeLessThan(DAYS.length / 4);
 });
 
-test("in free flight the autopilot keeps rounding turnpoints", () => {
+test("in free flight the autopilot keeps rounding beacons", () => {
 	const sim = createSim(977, FREE);
 	flyOnAutopilot(sim, 400);
 	expect(sim.next).toBeGreaterThanOrEqual(5);

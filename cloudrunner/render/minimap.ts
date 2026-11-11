@@ -21,7 +21,7 @@ function groundColor(pal: Palette, h: number, snow: number): RGB {
 
 /**
  * Heading-up map of the valley around the glider: terrain, the live thermals,
- * the next turnpoints, the route through them and a north marker. Drawn on its
+ * the next beacons, the route through them and a north marker. Drawn on its
  * own small canvas.
  */
 export class Minimap {
@@ -76,7 +76,7 @@ export class Minimap {
 		bctx.putImageData(img, 0, 0);
 	}
 
-	/** `plan` adds the autopilot's route: to the thermal it would use, then on to the turnpoint. */
+	/** `plan` adds the autopilot's route: to the thermal it would use, then on to the beacon. */
 	draw(sim: Sim, pal: Palette, scheme: string, plan: Plan | null = null): void {
 		const ctx = this.ctx;
 		if (this.canvas.clientWidth !== this.size) this.resize(this.ratio);
@@ -105,7 +105,7 @@ export class Minimap {
 		ctx.restore();
 
 		ctx.translate(R, R);
-		// Live thermals: soft discs sized by radius, pale when weak and orange when strong, thinning as they die.
+		// Live thermals in cyan, as in the scene: soft discs sized by radius, deeper when strong, thinning as they die.
 		for (const th of thermalsNear(sim.seed, p.x, p.z, sim.elapsed, 2)) {
 			const [x, y] = toMap(th.x - p.x, th.z - p.z);
 			const rad = th.radius * k;
@@ -121,7 +121,7 @@ export class Minimap {
 			ctx.fill();
 		}
 
-		// Route: glider → next turnpoints, dotted. With a plan, the first leg bends through its thermal.
+		// Route: glider → next beacons, dotted. With a plan, the first leg bends through its thermal.
 		const end = Math.min(sim.turnpoints.length, sim.next + TURNPOINTS_SHOWN);
 		ctx.strokeStyle = "rgba(255,255,255,0.85)";
 		ctx.lineWidth = plan ? 2 : 1.5;
@@ -141,7 +141,7 @@ export class Minimap {
 		ctx.stroke();
 		ctx.setLineDash([]);
 
-		// Turnpoints, farthest first; the next one is big and gold, pinned to the rim if out of range.
+		// Beacons in red, as in the scene, farthest first; the next one is big, pinned to the rim if out of range.
 		for (let i = end - 1; i >= sim.next; i--) {
 			const tp = sim.turnpoints[i];
 			if (!tp) continue;
@@ -154,8 +154,8 @@ export class Minimap {
 				y *= (R - 7) / d;
 			}
 			ctx.fillStyle = primary ? pal.beacon : pal.beaconDim;
-			ctx.strokeStyle = "rgba(0,0,0,0.45)";
-			ctx.lineWidth = 1;
+			ctx.strokeStyle = primary ? "#fff" : "rgba(0,0,0,0.45)";
+			ctx.lineWidth = primary ? 1.5 : 1;
 			ctx.beginPath();
 			ctx.arc(x, y, primary ? 5 : 3.5, 0, 6.283);
 			ctx.fill();
