@@ -51,7 +51,9 @@ test("the ready screen shows today's course, the leader, and opens replays with 
 			);
 		});
 		// No WebGL in Happy DOM: the tile explains instead of crashing.
-		expect(container.querySelector('[role="alert"]')).toHaveTextContent("3D graphics");
+		await waitFor(() => {
+			expect(container.querySelector('[role="alert"]')).toHaveTextContent("3D graphics");
+		});
 
 		fireEvent.click(container.querySelector('[data-testid="open-replays"]')!);
 		await waitFor(() => {
